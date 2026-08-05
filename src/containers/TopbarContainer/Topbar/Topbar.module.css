@@ -166,6 +166,21 @@
   }
 }
 
+/* Landing page: floating inset capsule topbar */
+.desktopLandingPage {
+  @media (--viewportLarge) {
+    padding: 16px 24px 0;
+    background-color: transparent;
+  }
+
+  @media (min-width: 1440px) {
+    padding: 0;
+    margin: 20px auto 0;
+    max-width: 100vw;
+    width: calc(100vw - 48px);
+  }
+}
+
 /* Icon component styles */
 .rootMenuIcon {
   fill: var(--colorGrey700);

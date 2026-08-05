@@ -1,9 +1,15 @@
 @import '../../styles/customMediaQueries.css';
 
 .root {
-  /* Layout */
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background-color: #111119;
+  border: 1px solid #24242B;
+  border-radius: 38px;
+  padding: 0px;
+  color: inherit;
 
   /* Remove link's hover effect */
   &:hover {
@@ -11,113 +17,141 @@
   }
 }
 
+.media {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 38px;
+  background-color: #1a1a22;
+}
+
 .aspectRatioWrapper {
   transition: var(--transitionStyleButton);
-  background: var(--colorGrey100); /* Loading BG color */
-  border-radius: var(--borderRadiusMedium);
+  background: #1a1a22;
+  border-radius: 18px;
+  overflow: hidden;
 
   @media (--viewportMedium) {
-    &:hover {
-      transform: scale(1.02);
-      box-shadow: var(--boxShadowListingCard);
+    .root:hover & {
+      filter: brightness(1.05);
     }
   }
 }
 
 .rootForImage {
-  border: solid 1px var(--colorGrey100);
-  border-radius: var(--borderRadiusMedium);
+  border: none;
+  border-radius: 18px;
   width: 100%;
   height: 100%;
-}
-
-.title.lightText {
-  color: var(--colorWhite);
-}
-
-.authorInfo.lightText {
-  color: var(--colorWhite);
+  object-fit: cover;
 }
 
 .info {
-  /* Layout */
   display: flex;
   flex-direction: column;
-  /* ⚠️ padding width is hardcoded in SectionListings.js calculateCarouselHeight() as cardInfoPadding*/
-  padding: 14px 0 2px 0;
+  align-items: flex-start;
+  gap: 10px;
+  /* ⚠️ padding is referenced from SectionListings.js calculateCarouselHeight() */
+  padding: 16px 24px 24px;
 }
 
-/* ⚠️ the total calculated height of this selector is hardcoded in SectionListings.js calculateCarouselHeight() as priceHeight*/
-.price {
-  composes: textSmall from global;
-  /* Layout */
-  flex-shrink: 0;
-  margin-bottom: 4px;
-  color: var(--colorGrey700);
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background-color: rgba(7, 114, 246, 0.18);
+  color: #3b93ff;
+  font-family: Inter, sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0;
 }
 
-.priceValue {
-  /* Font */
-  font-weight: var(--fontWeightSemiBold);
-  color: var(--marketplaceColor);
-
-  /* Remove default margins from font */
-  margin-top: 0;
-  margin-bottom: 0;
-
-  @media (--viewportMedium) {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-}
-
-.perUnit {
-  /* Font */
-  font-weight: var(--fontWeightSemiBold);
-  color: var(--marketplaceColor);
-
-  /* Remove default margins from font */
-  margin-top: 0;
-  margin-bottom: 0;
-
-  @media (--viewportMedium) {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
-}
-
-.mainInfo {
-  display: flex;
-  flex-direction: column;
-}
-
-/* ⚠️ the calculated height of this selector is hardcoded in SectionListings.js calculateCarouselHeight() as titleHeightSingleLine */
+/* ⚠️ height is referenced from SectionListings.js calculateCarouselHeight() */
 .title {
-  /* Font */
-  composes: textSmall from global;
-  font-weight: var(--fontWeightBold);
-  color: var(--colorGrey700);
+  margin: 0;
+  font-family: Inter;
+  font-weight: 600;
+  font-style: Semi Bold;
+  font-size: 26px;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: 0%;
+  text-align: center;
+  
+  color: #ffffff;
+  letter-spacing: 0;
+
+
+}
+
+.meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.location {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.locationIcon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  stroke: #c8c8d0;
+  fill: none;
+}
+
+.locationText {
+  font-family: Inter;
+  font-weight: 400;
+  font-style: Regular;
+  font-size: 12px;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: 0%;
+  
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ⚠️ height is referenced from SectionListings.js calculateCarouselHeight() */
+.price {
+  flex-shrink: 0;
+  font-family: Inter;
+font-weight: 500;
+font-style: Medium;
+font-size: 16px;
+leading-trim: NONE;
+line-height: 100%;
+letter-spacing: 0%;
+text-align: center;
+
+  color: #FFFFFF99;
   margin: 0;
 }
 
-/* ⚠️ the calculated height of this selector is hardcoded in SectionListings.js calculateCarouselHeight() as authorInfoHeight & authorInfoHeighMobile */
-.authorInfo {
-  /* Font */
-  composes: marketplaceTinyFontStyles from global;
-  font-weight: var(--fontWeightMedium);
-  color: var(--colorGrey700);
+.priceValue {
+  font-weight: inherit;
+  color: inherit;
+  margin: 0;
+}
 
-  padding-top: 4px;
-  padding-bottom: 4px;
-
-  /* Remove default margins from font */
-  margin-top: 0;
-  margin-bottom: 0;
-
-  @media (--viewportMedium) {
-    margin-top: 0;
-    margin-bottom: 0;
-  }
+.perUnit {
+  font-weight: inherit;
+  color: inherit;
+  margin: 0;
 }
 
 .longWord {

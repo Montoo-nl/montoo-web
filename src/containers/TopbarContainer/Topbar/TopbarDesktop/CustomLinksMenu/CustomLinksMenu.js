@@ -68,22 +68,25 @@ const groupMeasuredLinks = (links, containerWidth, menuMoreWidth) => {
 };
 
 const calculateContainerWidth = (containerRefTarget, parentWidth) => {
-  // Siblings include logo, search form, (inbox, profile menu || login signup)
+  // Siblings include logo, search form, and the right-side actions group
   const siblingArray = containerRefTarget?.parentNode?.childNodes
     ? Array.from(containerRefTarget.parentNode.childNodes).filter(n => n !== containerRefTarget)
     : [];
   const siblingWidthsCombined = siblingArray.reduce((acc, node) => acc + node.offsetWidth, 0);
 
-  // .root class of the TopbarDesktop has 24px padding on the right
+  // .root class of the TopbarDesktop has horizontal padding on both sides
   // Firefox doesn't support computedStyleMap()
   const parentStyleMap = containerRefTarget?.parentElement?.computedStyleMap
     ? containerRefTarget.parentElement.computedStyleMap()
     : null;
   const topbarPaddingRight = parentStyleMap?.get('padding-right')?.value;
-  const padding = topbarPaddingRight != null ? topbarPaddingRight : 24;
+  const topbarPaddingLeft = parentStyleMap?.get('padding-left')?.value;
+  const paddingRight = topbarPaddingRight != null ? topbarPaddingRight : 32;
+  const paddingLeft = topbarPaddingLeft != null ? topbarPaddingLeft : 32;
 
   // We figure out available width from parent (TopbarDesktop/<nav>) and siblings
-  const availableContainerWidth = parentWidth - siblingWidthsCombined - padding;
+  const availableContainerWidth =
+    parentWidth - siblingWidthsCombined - paddingRight - paddingLeft;
   return availableContainerWidth;
 };
 
@@ -116,7 +119,7 @@ const CustomLinksMenu = ({
   const [mounted, setMounted] = useState(false);
   const [moreLabelWidth, setMoreLabelWidth] = useState(0);
   const [links, setLinks] = useState([
-    ...createListingLinkConfigMaybe(intl, showCreateListingsLink),
+    // ...createListingLinkConfigMaybe(intl, showCreateListingsLink),
     ...customLinks,
   ]);
 
@@ -214,7 +217,7 @@ const CustomLinksMenu = ({
   const containerStyle = layoutReady ? { width: `${containerWidth}px` } : undefined;
 
   return (
-    <div className={containerClassName} ref={containerRef} style={containerStyle}>
+    <div className={containerClassName} ref={containerRef} >
       <PriorityLinks links={links} priorityLinks={priorityLinks} setLinks={setLinks} />
       {showLinksMenu ? (
         <LinksMenu

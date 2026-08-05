@@ -1,14 +1,17 @@
 .customLinksMenu {
   flex-grow: 1;
   display: flex;
-  justify-content: right;
+  justify-content: flex-start;
+  align-items: center;
   height: 100%;
+  min-width: 0;
 }
 .layoutPending {
   visibility: hidden;
 }
 .createListingLinkOnly {
   display: flex;
-  justify-content: right;
+  justify-content: flex-start;
+  align-items: center;
   height: 100%;
 }

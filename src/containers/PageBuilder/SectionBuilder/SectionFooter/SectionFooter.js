@@ -1,5 +1,4 @@
 import React from 'react';
-import classNames from 'classnames';
 import { LinkedLogo } from '../../../../components';
 
 import Field from '../../Field';
@@ -8,27 +7,7 @@ import BlockBuilder from '../../BlockBuilder';
 import SectionContainer from '../SectionContainer';
 import css from './SectionFooter.module.css';
 
-// The number of columns (numberOfColumns) affects styling
-
-const GRID_CONFIG = [
-  { contentCss: css.contentCol1, gridCss: css.gridCol1 },
-  { contentCss: css.contentCol2, gridCss: css.gridCol2 },
-  { contentCss: css.contentCol3, gridCss: css.gridCol3 },
-  { contentCss: css.contentCol4, gridCss: css.gridCol4 },
-];
 const MAX_MOBILE_SCREEN_WIDTH = 1024;
-
-const getIndex = numberOfColumns => numberOfColumns - 1;
-
-const getContentCss = numberOfColumns => {
-  const contentConfig = GRID_CONFIG[getIndex(numberOfColumns)];
-  return contentConfig ? contentConfig.contentCss : GRID_CONFIG[0].contentCss;
-};
-
-const getGridCss = numberOfColumns => {
-  const contentConfig = GRID_CONFIG[getIndex(numberOfColumns)];
-  return contentConfig ? contentConfig.gridCss : GRID_CONFIG[0].gridCss;
-};
 
 /**
  * @typedef {Object} SocialMediaLinkConfig
@@ -74,7 +53,6 @@ const SectionFooter = props => {
     sectionId,
     className,
     rootClassName,
-    numberOfColumns = 1,
     socialMediaLinks = [],
     slogan,
     appearance,
@@ -96,13 +74,12 @@ const SectionFooter = props => {
   });
 
   const showSocialMediaLinks = socialMediaLinks?.length > 0;
+  const hasBlocks = blocks?.length > 0;
   const hasMatchMedia = typeof window !== 'undefined' && window?.matchMedia;
   const isMobileLayout = hasMatchMedia
     ? window.matchMedia(`(max-width: ${MAX_MOBILE_SCREEN_WIDTH}px)`)?.matches
     : true;
   const logoLayout = isMobileLayout ? 'mobile' : 'desktop';
-
-  // use block builder instead of mapping blocks manually
 
   return (
     <SectionContainer
@@ -114,8 +91,8 @@ const SectionFooter = props => {
       options={fieldOptions}
     >
       <div className={css.footer}>
-        <div className={classNames(css.content, getContentCss(numberOfColumns))}>
-          <div>
+        <div className={css.content}>
+          <div className={css.brand}>
             <LinkedLogo
               rootClassName={css.logoLink}
               logoClassName={css.logoWrapper}
@@ -123,24 +100,28 @@ const SectionFooter = props => {
               linkToExternalSite={linkLogoToExternalSite}
               layout={logoLayout}
             />
-          </div>
-          <div className={css.sloganMobile}>
             <Field data={slogan} className={css.slogan} />
           </div>
-          <div className={css.detailsInfo}>
-            <div className={css.sloganDesktop}>
-              <Field data={slogan} className={css.slogan} />
+
+          {showSocialMediaLinks ? (
+            <div className={css.icons}>
+              <BlockBuilder blocks={linksWithBlockId} sectionId={sectionId} options={options} />
             </div>
-            {showSocialMediaLinks ? (
-              <div className={css.icons}>
-                <BlockBuilder blocks={linksWithBlockId} sectionId={sectionId} options={options} />
-              </div>
-            ) : null}
-            <Field data={copyright} className={css.copyright} />
-          </div>
-          <div className={classNames(css.grid, getGridCss(numberOfColumns))}>
-            <BlockBuilder blocks={blocks} sectionId={sectionId} options={options} />
-          </div>
+          ) : null}
+
+          {hasBlocks ? (
+            <div className={css.nav}>
+              <BlockBuilder
+                blocks={blocks}
+                sectionId={sectionId}
+                options={options}
+                rootClassName={css.navBlock}
+                textClassName={css.navText}
+              />
+            </div>
+          ) : null}
+
+          <Field data={copyright} className={css.copyright} />
         </div>
       </div>
     </SectionContainer>

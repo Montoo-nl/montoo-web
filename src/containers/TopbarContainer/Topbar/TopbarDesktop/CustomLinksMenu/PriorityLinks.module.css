@@ -5,29 +5,33 @@
   height: 100%;
   display: flex;
   flex-direction: row;
-  justify-content: right;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .priorityLink {
-  border-bottom: 0px solid;
+  border-bottom: none;
   transition: var(--transitionStyleButton);
 
   font-weight: var(--fontWeightMedium);
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0;
-  color: var(--colorGrey700);
+  color: #414141;
 
   flex-shrink: 0;
-  height: 100%;
-  padding: 0 12px 0 12px;
+  height: auto;
+  padding: 0 14px;
   margin: 0;
+  display: flex;
+  align-items: center;
 
   &:hover {
     color: var(--colorBlack);
-    border-bottom: 4px solid var(--marketplaceColor);
+    border-bottom: none;
     border-radius: 0;
     text-decoration: none;
+    opacity: 0.75;
   }
 
   @media (--viewportMedium) {
@@ -40,13 +44,14 @@
   color: var(--marketplaceColor);
   &:hover {
     color: var(--marketplaceColorDark);
+    opacity: 1;
   }
 }
 
 .priorityLinkLabel {
   composes: textSmall from global;
   display: inline-block;
-  margin: 28px 0;
+  margin: 0;
   text-decoration: inherit;
   text-wrap: nowrap;
 }

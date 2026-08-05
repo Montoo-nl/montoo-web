@@ -3,6 +3,7 @@ import classNames from 'classnames';
 
 import Field, { hasDataInFields } from '../../Field';
 import BlockBuilder from '../../BlockBuilder';
+import DualToneField from '../../DualToneField';
 
 import SectionContainer from '../SectionContainer';
 import css from './SectionColumns.module.css';
@@ -96,7 +97,12 @@ const SectionColumns = props => {
       {hasHeaderFields ? (
         <header className={defaultClasses.sectionDetails}>
           <Field data={title} className={defaultClasses.title} options={fieldOptions} />
-          <Field data={description} className={defaultClasses.description} options={fieldOptions} />
+          <DualToneField
+            data={description}
+            sectionId={sectionId}
+            className={defaultClasses.description}
+            options={fieldOptions}
+          />
           <Field data={callToAction} className={defaultClasses.ctaButton} options={fieldOptions} />
         </header>
       ) : null}

@@ -366,7 +366,11 @@ const TopbarComponent = props => {
         />
         {mobileSearchButtonMaybe}
       </nav>
-      <div className={css.desktop}>
+      <div
+        className={classNames(css.desktop, {
+          [css.desktopLandingPage]: resolvedCurrentPage === 'LandingPage',
+        })}
+      >
         <TopbarDesktop
           className={desktopClassName}
           currentUserHasListings={currentUserHasListings}

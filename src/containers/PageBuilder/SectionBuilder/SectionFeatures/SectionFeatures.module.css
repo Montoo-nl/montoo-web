@@ -36,3 +36,359 @@
   padding-left: 0;
   padding-right: 0;
 }
+
+/* Process section: center timeline overlay */
+.processLayout {
+  position: relative;
+}
+
+.processTimeline {
+  display: none;
+
+  @media (--viewportMedium) {
+    display: block;
+    position: absolute;
+    top: 0px;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    pointer-events: none;
+  }
+}
+
+.processSteps {
+  list-style: none;
+  margin: 0;
+  padding: 36px 0 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+/* Vertical connector line — extends past first and last steps */
+.processSteps::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background-color: #9ec5ff;
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.processStep {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  box-shadow: 0px 4px 4px 0px #0772F633 inset;
+  border-radius: 50%;
+  padding: 10px;
+  /* border: 10px solid #FFFFFF; */
+}
+
+.processStepInner {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #0772f6;
+
+
+  color: #ffffff;
+  font-family: Poppins;
+  font-weight: 800;
+  font-style: ExtraBold;
+  font-size: 30px;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: 0%;
+  text-align: center;
+
+
+}
+
+.processSmiley {
+  display: block;
+  color: #ffffff;
+}
+
+/* ========== FAQ accordion ========== */
+.faq {
+  max-width: 1111px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 32px 0px;
+
+  @media (--viewportMedium) {
+    padding: 32px 40px 0px;
+  }
+  @media (max-width: 768px) {
+    padding: 24px 16px 0px;
+  }
+  @media (max-width: 480px) {
+    padding: 20px 16px 0px;
+  }
+}
+
+.faqList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #e8e8e8;
+}
+
+.faqItem {
+  border-bottom: 1px solid #e8e8e8;
+  margin: 0;
+  padding: 0;
+  padding: 20px 0;
+}
+
+.faqQuestion {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 0px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+
+  @media (--viewportMedium) {
+    padding: 0px 0;
+    gap: 24px;
+  }
+
+  &:hover .faqToggle {
+    filter: brightness(1.06);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible .faqToggle {
+    box-shadow:
+      0 0 0 10px rgba(7, 114, 246, 0.22),
+      0 0 0 3px rgba(7, 114, 246, 0.45);
+  }
+}
+
+.faqQuestionText {
+  flex: 1;
+  min-width: 0;
+  font-family: Poppins;
+  font-weight: 700;
+  font-style: Bold;
+  font-size: 24px;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: 0%;
+  /* text-align: center; */
+
+  color: #000000;
+  @media (max-width: 768px) {
+    font-size: 20px;
+    line-height: 28px;
+  }
+  @media (max-width: 480px) {
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+
+}
+
+.faqToggleContainer {
+  box-shadow: 0px 4px 4px 0px #0772F633 inset;
+  padding: 10px;
+  border-radius: 50%;
+  @media (max-width: 768px) {
+    padding: 8px;
+  }
+  @media (max-width: 480px) {
+    padding: 6px;
+  }
+}
+
+.faqToggle {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #0772f6;
+  color: #ffffff;
+  font-family: Poppins, sans-serif;
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 1;
+  @media (max-width: 768px) {
+    width: 36px;
+    height: 36px;
+    font-size: 26px;
+  }
+  @media (max-width: 480px) {
+    width: 32px;
+    height: 32px;
+    font-size: 24px;
+  }
+
+  transition: var(--transitionStyleButton);
+
+  @media (--viewportMedium) {
+    width: 44px;
+    height: 44px;
+    font-size: 30px;
+
+  }
+}
+
+.faqAnswer {
+  overflow: hidden;
+  padding: 0 56px 0 0;
+  max-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.25s ease, visibility 0.2s;
+
+
+  @media (--viewportMedium) {
+    padding-right: 68px;
+    margin-top: -12px;
+  }
+
+  /* Answer copy from Field / markdown */
+  & p,
+  & li {
+    font-family: Inter;
+    font-weight: 400;
+    font-style: Regular;
+    font-size: 16px;
+    leading-trim: NONE;
+    line-height: 100%;
+    letter-spacing: 0%;
+
+    color: #00000099;
+    margin: 0;
+    @media (max-width: 768px) {
+      font-size: 16px;
+      line-height: 24px;
+    }
+    @media (max-width: 480px) {
+      font-size: 14px;
+      line-height: 20px;
+    }
+  }
+
+  & p+p {
+    margin-top: 12px;
+  }
+
+  & a {
+    color: #0772f6;
+  }
+}
+
+.faqAnswerOpen {
+  max-height: 480px;
+  opacity: 1;
+  visibility: visible;
+  padding-bottom: 24px;
+
+  @media (--viewportMedium) {
+    padding-bottom: 28px;
+  }
+}
+
+.faqCta {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+
+  @media (--viewportMedium) {
+    margin-top: 48px;
+  }
+}
+
+.faqCtaButton {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 14px 28px !important;
+  margin: 0 !important;
+  max-width: none !important;
+  pointer-events: auto !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: linear-gradient(180deg, #3b93ff 0%, #0772f6 48.51%, #0552b5 100%) !important;
+  box-shadow: 0 6px 14px 0 #0772f666 !important;
+  color: #ffffff !important;
+  font-family: Poppins;
+  font-weight: 700;
+  font-style: Bold;
+  font-size: 20px !important;
+  leading-trim: NONE;
+  line-height: 100%;
+  letter-spacing: 0% !important;
+  text-transform: uppercase;
+  
+  text-align: center !important;
+  text-decoration: none !important;
+  transition: var(--transitionStyleButton);
+  @media (max-width: 768px) {
+    font-size: 16px !important;
+  }
+  @media (max-width: 480px) {
+    font-size: 14px !important;
+  }
+
+  &:hover {
+    filter: brightness(1.05);
+    text-decoration: none !important;
+    color: #ffffff !important;
+  }
+
+  &::after {
+    content: '';
+    background-image: url("data:image/svg+xml,%3Csvg width='34' height='34' viewBox='0 0 34 34' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.597 22.1401C21.5001 22.122 21.4077 22.0851 21.3251 22.0313C21.2425 21.9775 21.1713 21.908 21.1156 21.8267C21.0599 21.7454 21.0208 21.6539 21.0004 21.5574C20.9801 21.461 20.979 21.3615 20.9971 21.2646L22.4182 13.6607L10.3003 21.9639C10.1362 22.0764 9.9342 22.119 9.73867 22.0825C9.54314 22.0459 9.37013 21.9332 9.2577 21.7692C9.14526 21.6051 9.10262 21.403 9.13914 21.2075C9.17567 21.012 9.28837 20.839 9.45246 20.7265L21.5704 12.4234L13.9663 11.0035C13.7706 10.967 13.5975 10.8542 13.485 10.6901C13.3725 10.5259 13.3299 10.3237 13.3664 10.1281C13.403 9.93245 13.5157 9.75935 13.6799 9.64685C13.8441 9.53435 14.0462 9.49169 14.2419 9.52823L23.6255 11.2811C23.7224 11.2992 23.8148 11.3361 23.8974 11.3899C23.98 11.4437 24.0512 11.5132 24.1069 11.5945C24.1626 11.6758 24.2017 11.7673 24.2221 11.8638C24.2424 11.9602 24.2435 12.0597 24.2254 12.1566L22.4725 21.5402C22.4544 21.6371 22.4174 21.7295 22.3637 21.8121C22.3099 21.8947 22.2404 21.9659 22.1591 22.0216C22.0778 22.0773 21.9863 22.1164 21.8898 22.1368C21.7934 22.1571 21.6939 22.1582 21.597 22.1401Z' fill='white'/%3E%3C/svg%3E%0A");
+    width: 34px;
+    height: 34px;
+    background-size: 34px 34px;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-left: 4px;
+    font-family: Poppins;
+    font-weight: 700;
+    font-style: Bold;
+    font-size: 20px;
+    leading-trim: NONE;
+    line-height: 100%;
+    letter-spacing: 0%;
+    text-transform: uppercase;
+
+  }
+}

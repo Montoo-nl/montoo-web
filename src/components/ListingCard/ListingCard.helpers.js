@@ -26,6 +26,22 @@ const priceData = (price, currency, intl) => {
   return {};
 };
 
+const findCategoryLabel = (categories = [], optionId) => {
+  if (!optionId) {
+    return null;
+  }
+  for (const category of categories) {
+    if (category.id === optionId) {
+      return category.name || category.label || optionId;
+    }
+    const nested = findCategoryLabel(category.subcategories, optionId);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+};
+
 /**
  * Returns all translated and formatted strings for ListingCard so the
  * presentational component can stay simple and aria-labels use the same copy.
@@ -39,8 +55,11 @@ const priceData = (price, currency, intl) => {
  *   - showPrice: whether to show the price block
  *   - priceTooltip: string for the price element's title attribute (tooltip on hover)
  *   - priceMessage: string or null for the price block content (same translation as used in cardAriaLabel when shown)
+ *   - formattedPrice: plain formatted money string
  *   - cardAriaLabel: ready-to-use aria-label for the card link (listing title + price line when shown)
  *   - authorName: "ListingCard.author" string containing author's display name
+ *   - locationAddress: location address from publicData when available
+ *   - categoryLabel: resolved category label for badge when available
  */
 export const getListingCardTranslations = (listing, config, intl) => {
   const { title = '', price, publicData } = listing?.attributes || {};
@@ -52,7 +71,7 @@ export const getListingCardTranslations = (listing, config, intl) => {
   );
 
   const validListingTypes = config.listing.listingTypes || [];
-  const { listingType } = publicData || {};
+  const { listingType, location, categoryLevel1 } = publicData || {};
   const listingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
 
   const showPrice = displayPrice(listingTypeConfig);
@@ -86,6 +105,11 @@ export const getListingCardTranslations = (listing, config, intl) => {
         )
       : title;
 
+  const categories = config.categoryConfiguration?.categories || [];
+  const categoryLabel =
+    findCategoryLabel(categories, categoryLevel1) ||
+    (typeof categoryLevel1 === 'string' ? categoryLevel1 : null);
+
   return {
     titlePlain: title,
     titleFormatted: richText(title, {
@@ -96,6 +120,9 @@ export const getListingCardTranslations = (listing, config, intl) => {
     showPrice,
     priceTooltip,
     priceMessage,
+    formattedPrice,
     cardAriaLabel,
+    locationAddress: location?.address || null,
+    categoryLabel,
   };
 };

@@ -1,53 +1,71 @@
 @import '../../../../styles/customMediaQueries.css';
 
-/* Desktop */
+/* Desktop — floating capsule bar */
 .root {
-  /* Size */
   width: 100%;
   height: var(--topbarHeightDesktop);
 
-  /* Layout for child components */
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 0 12px 0 0;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 0 28px;
 
-  /* fill */
   background-color: var(--colorWhite);
-
-  /* shadows */
-  box-shadow: var(--boxShadowLight);
+ 
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
 
   @media (--viewportLarge) {
-    padding: 0 24px 0 0;
+    padding: 0 32px 0 0;
+    gap: 12px;
   }
+}
+
+/* Landing page variant — hook for page-specific topbar styles */
+.rootLandingPage {
+   border-radius: 16px;
+   height: 85px;
+
 }
 
 /* logo */
 .logoLink {
-  border-bottom: 0px solid;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+  border-bottom: none;
   transition: var(--transitionStyleButton);
 }
 .logoLink:hover {
-  border-bottom: 4px solid var(--marketplaceColor);
+  border-bottom: none;
   border-radius: 0;
+  opacity: 0.85;
 }
 
 /* Search */
 .searchLink {
-  min-width: 320px;
+  flex-shrink: 1;
+  min-width: 140px;
+  max-width: 388px;
+  width: 100%;
   height: 100%;
-  border-left-style: solid;
-  border-left-width: 1px;
-  border-left-color: var(--colorGrey100);
-  margin-right: auto;
+  margin-left: auto;
+  margin-right: 4px;
+  border-left: none;
+  display: flex;
+  align-items: center;
+  margin-right: 30px;
 }
 
 .spacer {
-  min-width: 320px;
+  flex-shrink: 1;
+  min-width: 140px;
+  max-width: 280px;
   height: 100%;
-  margin-right: auto;
+  margin-left: auto;
+  margin-right: 4px;
 }
 
 .search {
@@ -58,7 +76,7 @@
   color: var(--colorGrey700);
 
   display: inline-block;
-  margin: 28px 0;
+  margin: 0;
   text-decoration: inherit;
 
   @media (--viewportMedium) {
@@ -68,43 +86,46 @@
 
 .takeAvailableSpace {
   flex-grow: 1;
-
-  /* At 1024px, the translations might need more space than what searchLink otherwise gets. */
-  min-width: 220px;
+  min-width: 160px;
+  max-width: 360px;
 }
 
 .topbarSearchWithLeftPadding {
-  padding-left: 24px;
-  padding-right: 24px;
-  height: var(--topbarHeightDesktop);
-
-  @media (--viewportLarge) {
-    padding-left: 34px;
-  }
+  padding-left: 0;
+  padding-right: 0;
+  height: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #EEEEEE;
+  
 }
 
-/* These is used with Inbox, Sign up, and Log in */
+/* These is used with Inbox */
 .topbarLink {
   flex-shrink: 0;
 
-  border-bottom: 0px solid;
+  border-bottom: none;
   transition: var(--transitionStyleButton);
 
   font-weight: var(--fontWeightMedium);
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0;
-  color: var(--colorGrey700);
+  color: var(--colorGrey800);
 
-  height: 100%;
-  padding: 0 12px 0 12px;
+  height: auto;
+  padding: 0 8px;
   margin: 0;
+  display: flex;
+  align-items: center;
 
   &:hover {
     color: var(--colorBlack);
-    border-bottom: 4px solid var(--marketplaceColor);
+    border-bottom: none;
     border-radius: 0;
     text-decoration: none;
+    opacity: 0.75;
   }
 
   @media (--viewportMedium) {
@@ -116,7 +137,7 @@
 .topbarLinkLabel {
   composes: textSmall from global;
   display: inline-block;
-  margin: 28px 0;
+  margin: 0;
   text-decoration: inherit;
   position: relative;
 }
@@ -156,43 +177,131 @@
   }
 }
 
-/* Profile menu */
-.profileMenuLabel {
-  border-bottom: 0px solid;
-  transition: var(--transitionStyleButton);
-
-  font-weight: var(--fontWeightMedium);
-  font-size: 14px;
-  line-height: 18px;
-  letter-spacing: 0;
-  color: var(--colorGrey700);
-
+/* Right actions: profile + CTA */
+.rightSection {
   flex-shrink: 0;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  height: 100%;
+  gap: 12px;
+  margin-left: 4px;
+}
+
+/* Circular login / profile affordance */
+.loginIconLink {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 43px;
+  height: 56px;
+  padding: 0;
   margin: 0;
-  padding: 0 12px 0 12px;
+  color: var(--colorGrey700);
+  border: 1px solid #EEEEEE;
+  border-radius: 30px;
+  background-color: transparent;
+  transition: var(--transitionStyleButton);
 
   &:hover {
-    border-bottom: 4px solid var(--marketplaceColor);
-    border-radius: 0;
+    color: var(--colorGrey900);
+    border-color: var(--colorGrey300);
+    text-decoration: none;
+  }
+}
+
+.profileIconSvg {
+  display: block;
+  fill:transparent
+}
+
+/* JOIN US CTA */
+.joinUsButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 20px;
+  margin: 0;
+
+  color: var(--colorWhite);
+  background: linear-gradient(180deg, #3B93FF 0%, #0772F6 48.51%, #0552B5 100%);
+
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  transition: var(--transitionStyleButton);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--colorWhite);
+    text-decoration: none;
+    filter: brightness(1.05);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+  }
+}
+
+.joinUsLabel {
+  font-family: Poppins;
+font-weight: 700;
+font-style: Bold;
+font-size: 20px;
+leading-trim: NONE;
+line-height: 100%;
+letter-spacing: 0%;
+text-transform: uppercase;
+
+  white-space: nowrap;
+}
+
+.joinUsArrow {
+  font-size: 14px;
+  line-height: 1;
+  font-weight: var(--fontWeightBold);
+}
+
+/* Profile menu */
+.profileMenuLabel {
+  border-bottom: none;
+  transition: var(--transitionStyleButton);
+
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  width: 40px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--colorGrey200);
+  border-radius: 50%;
+  overflow: hidden;
+
+  &:hover {
+    border-bottom: none;
+    border-color: var(--colorGrey300);
+    border-radius: 50%;
     text-decoration: none;
   }
 
   &:active {
-    border-bottom: 0;
+    border-bottom: none;
   }
 }
 
 .profileMenuIsOpen {
   &:hover {
-    border-bottom: 0;
+    border-bottom: none;
   }
 }
 
 .avatar {
-  margin: 16px 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .profileMenuContent {

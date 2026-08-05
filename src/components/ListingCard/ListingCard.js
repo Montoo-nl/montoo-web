@@ -12,6 +12,7 @@ import { createSlug } from '../../util/urlHelpers';
 
 import {
   AspectRatioWrapper,
+  IconLocation,
   NamedLink,
   ResponsiveImage,
   ListingCardThumbnail,
@@ -103,7 +104,6 @@ export const ListingCard = props => {
     className,
     rootClassName,
     aspectRatioClassName,
-    darkMode,
     listing,
     renderSizes,
     setActiveListing,
@@ -118,8 +118,10 @@ export const ListingCard = props => {
     cardAriaLabel,
     showPrice,
     priceTooltip,
-    priceMessage,
+    formattedPrice,
     authorName,
+    locationAddress,
+    categoryLabel,
   } = translations;
 
   const classes = classNames(rootClassName || css.root, className);
@@ -155,44 +157,50 @@ export const ListingCard = props => {
       params={{ id, slug }}
       ariaLabel={cardAriaLabel}
     >
-      {showListingImage ? (
-        <ListingCardImage
-          renderSizes={renderSizes}
-          title={titlePlain}
-          listing={listing}
-          setActivePropsMaybe={setActivePropsMaybe}
-          aspectWidth={aspectWidth}
-          aspectHeight={aspectHeight}
-          variantPrefix={variantPrefix}
-          aspectRatioClassName={aspectRatioClassName}
-          lazyLoadImage={lazyLoadImage}
-        />
-      ) : (
-        <ListingCardThumbnail
-          style={cardStyle}
-          listingTitle={title}
-          className={aspectRatioClassName}
-          width={aspectWidth}
-          height={aspectHeight}
-          setActivePropsMaybe={setActivePropsMaybe}
-        />
-      )}
+      <div className={css.media}>
+        {showListingImage ? (
+          <ListingCardImage
+            renderSizes={renderSizes}
+            title={titlePlain}
+            listing={listing}
+            setActivePropsMaybe={setActivePropsMaybe}
+            aspectWidth={aspectWidth}
+            aspectHeight={aspectHeight}
+            variantPrefix={variantPrefix}
+            aspectRatioClassName={aspectRatioClassName}
+            lazyLoadImage={lazyLoadImage}
+          />
+        ) : (
+          <ListingCardThumbnail
+            style={cardStyle}
+            listingTitle={title}
+            className={aspectRatioClassName}
+            width={aspectWidth}
+            height={aspectHeight}
+            setActivePropsMaybe={setActivePropsMaybe}
+          />
+        )}
+      </div>
       <div className={css.info}>
-        {showPrice ? (
-          <div className={css.price} title={priceTooltip}>
-            {priceMessage}
-          </div>
-        ) : null}
-        <div className={css.mainInfo}>
-          {showListingImage && (
-            <div className={classNames(css.title, { [css.lightText]: darkMode })}>
-              {titleFormatted}
-            </div>
+        {categoryLabel ? <span className={css.categoryBadge}>{categoryLabel}</span> : null}
+        {showListingImage ? <div className={css.title}>{titleFormatted}</div> : null}
+        <div className={css.meta}>
+          {locationAddress ? (
+            <span className={css.location}>
+              <IconLocation className={css.locationIcon} />
+              <span className={css.locationText}>{locationAddress}</span>
+            </span>
+          ) : showAuthorInfo ? (
+            <span className={css.location}>
+              <span className={css.locationText}>{authorName}</span>
+            </span>
+          ) : (
+            <span />
           )}
-          {showAuthorInfo ? (
-            <div className={classNames(css.authorInfo, { [css.lightText]: darkMode })}>
-              {authorName}
-            </div>
+          {showPrice && formattedPrice ? (
+            <span className={css.price} title={priceTooltip}>
+              {formattedPrice}
+            </span>
           ) : null}
         </div>
       </div>

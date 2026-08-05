@@ -19,37 +19,38 @@
 .linkMenuLabelWrapper {
   display: inline-flex;
   flex-direction: row;
-  align-items: baseline;
-  margin: 27px 0;
+  align-items: center;
+  margin: 0;
   text-decoration: inherit;
 }
 
 .linkMenuLabel {
   flex-shrink: 0;
 
-  border-bottom: 0px solid;
+  border-bottom: none;
   transition: var(--transitionStyleButton);
 
   font-weight: var(--fontWeightMedium);
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0;
-  color: var(--colorGrey700);
+  color: var(--colorGrey800);
 
   display: inline;
-  height: 100%;
+  height: auto;
   margin: 0;
-  padding: 0 12px 0 12px;
+  padding: 0 12px;
 
   &:hover {
-    border-bottom: 4px solid var(--marketplaceColor);
+    border-bottom: none;
     border-radius: 0;
     text-decoration: none;
     color: var(--colorBlack);
+    opacity: 0.75;
   }
 
   &:active {
-    border-bottom: 0;
+    border-bottom: none;
   }
 }
 

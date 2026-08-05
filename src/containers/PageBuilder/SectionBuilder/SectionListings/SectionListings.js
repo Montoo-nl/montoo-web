@@ -9,6 +9,7 @@ import { FormattedMessage } from '../../../../util/reactIntl';
 import { ListingCard, IconSpinner, ErrorMessage, NamedLink } from '../../../../components';
 
 import Field, { hasDataInFields } from '../../Field';
+import DualToneField from '../../DualToneField';
 import SectionContainer from '../SectionContainer';
 
 import css from './SectionListings.module.css';
@@ -89,22 +90,18 @@ const calculateCarouselHeight = (
     return noListingsFoundHeight;
   }
 
+  // Values match ListingCard.module.css (padded dark card: image + badge + title + meta)
   const thumbnailAspectRatio = config.layout.listingImage.aspectRatio;
   const paddingHorizontal = 2 * 32; // 2x32px
-  const titleHeightSingleLine = 16;
-  const titleHeightDoubleLine = titleHeightSingleLine * 2;
-  const cardInfoPadding = 14 + 2; // padding-top + padding-bottom
-  const priceHeight = 16 + 4; // height + margin-bottom
-  const authorInfoHeight = 24;
+  const cardPadding = 14 * 2;
+  const cardInfoPadding = 16 + 8;
+  const badgeHeight = 24;
+  const titleHeight = isMobileBreakpoint ? 26 : 28;
+  const metaHeight = 18 + 4;
+  const contentGaps = 10 * 2;
   const contentMaxWidthPages = 1120;
   const containerPaddingTop = 32;
   const containerPaddingBottom = 24;
-
-  const priceHeightMobile = 18 + 4; // 18 + margin bottom
-  const authorInfoHeightMobile = 18 + 4 + 4; // 18 + padding top + padding bottom
-  const titleHeightSingleLineMobile = 18;
-  const cardInfoHeightMobile =
-    priceHeightMobile + authorInfoHeightMobile + titleHeightSingleLineMobile + cardInfoPadding;
 
   const parsedAspectRatio = parseAspectRatio(thumbnailAspectRatio);
 
@@ -113,11 +110,10 @@ const calculateCarouselHeight = (
   const mainColumnWidth = Math.min(contentMaxWidthPages, carouselWidth);
   const cardWidth =
     (mainColumnWidth - paddingHorizontal - gutters) / (isMobileBreakpoint ? 1 : numColumns);
-  const cardImageHeight = cardWidth / parsedAspectRatio;
-  const cardInfoHeight = priceHeight + titleHeightSingleLine + authorInfoHeight + cardInfoPadding;
+  const cardImageHeight = (cardWidth - cardPadding) / parsedAspectRatio;
+  const cardInfoHeight = cardInfoPadding + badgeHeight + titleHeight + metaHeight + contentGaps;
 
-  const totalCardHeight =
-    cardImageHeight + (isMobileBreakpoint ? cardInfoHeightMobile : cardInfoHeight);
+  const totalCardHeight = cardImageHeight + cardPadding + cardInfoHeight;
   const totalWithPaddings = totalCardHeight + containerPaddingTop + containerPaddingBottom;
 
   return Math.ceil(totalWithPaddings);
@@ -340,7 +336,12 @@ const SectionListings = props => {
       {hasHeaderFields ? (
         <header className={defaultClasses.sectionDetails}>
           <Field data={title} className={defaultClasses.title} options={fieldOptions} />
-          <Field data={description} className={defaultClasses.description} options={fieldOptions} />
+          <DualToneField
+            data={description}
+            sectionId={sectionId}
+            className={defaultClasses.description}
+            options={fieldOptions}
+          />
           <Field data={callToAction} className={defaultClasses.ctaButton} options={fieldOptions} />
         </header>
       ) : null}

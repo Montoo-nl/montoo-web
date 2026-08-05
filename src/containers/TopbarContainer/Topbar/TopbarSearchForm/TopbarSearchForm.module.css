@@ -5,7 +5,9 @@
 }
 
 .desktopInputRoot {
-  height: var(--topbarHeightDesktop);
+  height: auto;
+  display: flex;
+  align-items: center;
 }
 
 .mobileIcon {
@@ -65,25 +67,30 @@
 }
 
 .desktopIcon {
-  height: var(--topbarHeightDesktop);
+  height: auto;
   border: none;
-  padding-top: 2px;
+  padding: 0;
 
   display: flex;
-  width: 24px;
-  align-self: stretch;
-  background-color: var(--colorWhite);
+  width: 20px;
+  align-items: center;
+  align-self: center;
+  background-color: transparent;
 }
 
 .desktopInput {
   composes: p from global;
   flex-grow: 1;
   /* Font */
-  height: var(--topbarHeightDesktop);
+  height: 36px;
   line-height: unset;
   border: none;
   padding-top: 0;
   padding-bottom: 0;
+  font-weight: var(--fontWeightMedium);
+  font-size: 14px;
+  color: var(--colorGrey800);
+  background-color: transparent;
 
   /* Search text gets ellipsis if it's too wide */
   text-overflow: ellipsis;
@@ -91,11 +98,10 @@
 
   margin-top: 0;
   margin-bottom: 0;
-  margin-left: 10px;
+  margin-left: 8px;
 
   &:hover,
   &:focus {
-    border-bottom-color: var(--marketplaceColor);
     outline: none;
     border: 0;
     box-shadow: none;
@@ -103,11 +109,12 @@
 
   &:hover::placeholder,
   &:focus::placeholder {
-    color: var(--colorGrey700);
+    color: var(--colorGrey500);
   }
 
   /* Placeholder text might be too wide */
   &::placeholder {
+    color: var(--colorGrey400);
     text-overflow: ellipsis;
     overflow-x: hidden;
     transition: var(--transitionStyleButton);
@@ -151,7 +158,7 @@
 .desktopPredictions {
   position: absolute;
   width: 100%;
-  top: var(--topbarHeightDesktop);
+  top: calc(100% + 12px);
   left: 0;
   background-color: var(--marketplaceColor);
   border-bottom-left-radius: var(--borderRadius);
@@ -169,6 +176,8 @@
 .keywordSearchWrapper {
   position: relative;
   display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .searchSubmit {
@@ -176,13 +185,16 @@
   border: 0;
   padding: 0;
   cursor: pointer;
+  background: transparent;
+  display: flex;
+  align-items: center;
 
   &:hover,
   &:focus {
     outline: none;
 
     & .iconSvgGroup {
-      stroke: var(--colorGrey700);
+      stroke: var(--colorGrey800);
     }
   }
 
@@ -190,10 +202,10 @@
   &:after {
     content: '';
     position: absolute;
-    top: 0px;
-    bottom: 0px;
-    left: -24px;
-    right: 0px;
+    top: -8px;
+    bottom: -8px;
+    left: -8px;
+    right: -8px;
   }
 }
 
@@ -207,13 +219,14 @@
 
 .iconSvg {
   margin: auto;
+  fill:transparent
 }
 
 .iconSvgGroup {
-  stroke: var(--marketplaceColor);
-  stroke-width: 2.5px;
+  stroke: var(--colorGrey600);
+  stroke-width: 1.75px;
 
   @media (--viewportMedium) {
-    stroke-width: 2px;
+    stroke-width: 1.5px;
   }
 }
