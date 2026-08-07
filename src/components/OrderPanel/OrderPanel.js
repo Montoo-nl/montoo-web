@@ -22,7 +22,7 @@ import {
   STOCK_INFINITE_MULTIPLE_ITEMS,
   LISTING_STATE_PUBLISHED,
 } from '../../util/types';
-import { formatMoney } from '../../util/currency';
+import { formatMoney, moneyFromExtendedData } from '../../util/currency';
 import { createSlug, parse, stringify } from '../../util/urlHelpers';
 import { userDisplayNameAsString } from '../../util/data';
 import {
@@ -152,18 +152,23 @@ const PriceMaybe = props => {
   const { listingType, unitType } = publicData || {};
 
   const foundListingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
-  const showPrice = displayPrice(foundListingTypeConfig);
+  const showPrice = true || displayPrice(foundListingTypeConfig);
   const isPriceVariationsInUse = !!publicData?.priceVariationsEnabled;
   const hasMultiplePriceVariants = publicData?.priceVariants?.length > 1;
 
-  if (!showPrice || !price || (isPriceVariationsInUse && hasMultiplePriceVariants)) {
+  // A job's amount is the compensation the company offers, saved to publicData
+  // as plain data. Fall back to the listing's own price for listings that were
+  // created before compensation existed.
+  const displayedPrice = moneyFromExtendedData(publicData?.compensation) || price;
+
+  if (!showPrice || !displayedPrice || (isPriceVariationsInUse && hasMultiplePriceVariants)) {
     return null;
   }
 
   // Get formatted price or currency code if the currency does not match with marketplace currency
-  const { formattedPrice, priceTitle } = priceData(price, marketplaceCurrency, intl);
+  const { formattedPrice, priceTitle } = priceData(displayedPrice, marketplaceCurrency, intl);
   const priceValue = (
-    <span className={css.priceValue}>{formatMoneyIfSupportedCurrency(price, intl)}</span>
+    <span className={css.priceValue}>{formatMoneyIfSupportedCurrency(displayedPrice, intl)}</span>
   );
   const pricePerUnit = (
     <span className={css.perUnit}>

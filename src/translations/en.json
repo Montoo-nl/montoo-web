@@ -1582,5 +1582,8 @@
   "ProfileSettingsForm.companyWebsitePlaceholder": "https://acme.nl",
   "ProfileSettingsForm.companyWebsiteInvalid": "That doesn't look like a valid website address.",
   "TopbarDesktop.createJobLink": "Create a job",
-  "TopbarMobileMenu.createJobLink": "Create a job"
+  "TopbarMobileMenu.createJobLink": "Create a job",
+  "EditListingDetailsForm.compensationLabel": "Compensation",
+  "EditListingDetailsForm.compensationPlaceholder": "What are you paying for this job?",
+  "EditListingDetailsForm.compensationRequired": "Compensation is required."
 }

@@ -12,6 +12,29 @@ const { Money } = sdkTypes;
 export const MIN_SAFE_INTEGER = Number.MIN_SAFE_INTEGER || -1 * (2 ** 53 - 1);
 export const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER || 2 ** 53 - 1;
 
+/**
+ * Extended data only takes JSON-compatible values, so a Money has to be stored
+ * as a plain { amount, currency } object. The amount stays in the currency's
+ * subunits, which is what Money uses internally, so nothing is rounded.
+ *
+ * @param {Money} money value from a FieldCurrencyInput
+ * @returns {Object|null} { amount, currency }, or null for a non-Money value
+ */
+export const moneyToExtendedData = money =>
+  money instanceof Money ? { amount: money.amount, currency: money.currency } : null;
+
+/**
+ * The counterpart of moneyToExtendedData: turns stored extended data back into
+ * a Money, e.g. for formatMoney or a FieldCurrencyInput's initial value.
+ *
+ * @param {Object} data { amount, currency } as stored in extended data
+ * @returns {Money|null} null when the data is missing or malformed
+ */
+export const moneyFromExtendedData = data => {
+  const { amount, currency } = data || {};
+  return typeof amount === 'number' && currency ? new Money(amount, currency) : null;
+};
+
 export const isSafeNumber = decimalValue => {
   if (!(decimalValue instanceof Decimal)) {
     throw new Error('Value must be a Decimal');

@@ -9,6 +9,7 @@ import { types as sdkTypes } from '../../util/sdkLoader.js';
 import { useConfiguration } from '../../context/configurationContext.js';
 import { useRouteConfiguration } from '../../context/routeConfigurationContext.js';
 import { userDisplayNameAsString } from '../../util/data.js';
+import { moneyFromExtendedData } from '../../util/currency.js';
 import { LISTING_UNIT_TYPES } from '../../util/types.js';
 import { isErrorNoPermissionForInitiateTransactions } from '../../util/errors.js';
 import {
@@ -207,7 +208,11 @@ const MakeOfferPageComponent = props => {
     : [];
   const isUpdateOffer =
     isUpdateOfferEnabled && updateOfferStates.includes(transaction?.attributes?.state);
-  const price = isUpdateOffer ? currentOffer : listingPrice;
+  // A new offer starts from the compensation the company put on the job. When
+  // an existing offer is being updated, the current offer wins.
+  const price = isUpdateOffer
+    ? currentOffer
+    : moneyFromExtendedData(publicData?.compensation) || listingPrice;
   const providerDefaultMessage = isUpdateOffer
     ? transaction.attributes?.protectedData?.providerDefaultMessage
     : null;

@@ -38,6 +38,10 @@
   flex-shrink: 0;
 }
 
+.compensation {
+  composes: formMargins;
+}
+
 .listingTypeSelect {
   margin-bottom: 24px;
 

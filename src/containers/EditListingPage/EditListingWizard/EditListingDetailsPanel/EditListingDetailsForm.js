@@ -4,6 +4,7 @@ import arrayMutators from 'final-form-arrays';
 import classNames from 'classnames';
 
 // Import util modules
+import appSettings from '../../../../config/settings';
 import { FormattedMessage, useIntl } from '../../../../util/reactIntl';
 import { displayDescription } from '../../../../util/configHelpers.js';
 import { useConfiguration } from '../../../../context/configurationContext.js';
@@ -19,6 +20,7 @@ import { maxLength, required, composeValidators } from '../../../../util/validat
 import {
   Form,
   Button,
+  FieldCurrencyInput,
   FieldSelect,
   FieldTextInput,
   Heading,
@@ -461,6 +463,22 @@ const EditListingDetailsForm = props => (
               selectedCategories={pickSelectedCategories(values)}
               formId={formId}
               intl={intl}
+            />
+          )}
+
+          {showListingFields && isCompatibleCurrency && (
+            <FieldCurrencyInput
+              id={`${formId}compensation`}
+              name="compensation"
+              className={css.compensation}
+              label={intl.formatMessage({ id: 'EditListingDetailsForm.compensationLabel' })}
+              placeholder={intl.formatMessage({
+                id: 'EditListingDetailsForm.compensationPlaceholder',
+              })}
+              currencyConfig={appSettings.getCurrencyFormatting(currencyToCheck)}
+              validate={required(
+                intl.formatMessage({ id: 'EditListingDetailsForm.compensationRequired' })
+              )}
             />
           )}
 

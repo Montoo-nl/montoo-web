@@ -15,6 +15,7 @@ import {
   isFieldForListingType,
   pickCategoryFields,
 } from '../../../../util/fieldHelpers';
+import { moneyFromExtendedData, moneyToExtendedData } from '../../../../util/currency';
 import { isBookingProcessAlias } from '../../../../transactions/transaction';
 
 // Import shared components
@@ -252,6 +253,7 @@ const getInitialValues = (
   return {
     title,
     description,
+    compensation: moneyFromExtendedData(publicData?.compensation),
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -392,6 +394,7 @@ const EditListingDetailsPanel = props => {
               listingType,
               transactionProcessAlias,
               unitType,
+              compensation,
               ...rest
             } = values;
 
@@ -423,6 +426,7 @@ const EditListingDetailsPanel = props => {
                 listingType,
                 transactionProcessAlias,
                 unitType,
+                compensation: moneyToExtendedData(compensation),
                 ...cleanedNestedCategories,
                 ...publicListingFields,
               },

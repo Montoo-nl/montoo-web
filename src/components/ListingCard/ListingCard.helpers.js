@@ -1,5 +1,5 @@
 import { displayPrice, isPriceVariationsEnabled } from '../../util/configHelpers';
-import { formatMoney } from '../../util/currency';
+import { formatMoney, moneyFromExtendedData } from '../../util/currency';
 import { richText } from '../../util/richText';
 import { isBookingProcessAlias } from '../../transactions/transaction';
 
@@ -71,11 +71,15 @@ export const getListingCardTranslations = (listing, config, intl) => {
   );
 
   const validListingTypes = config.listing.listingTypes || [];
-  const { listingType, location, categoryLevel1 } = publicData || {};
+  const { listingType, location, categoryLevel1, compensation } = publicData || {};
   const listingTypeConfig = validListingTypes.find(conf => conf.listingType === listingType);
 
-  const showPrice = displayPrice(listingTypeConfig);
-  const { formattedPrice, priceTooltip } = priceData(price, config.currency, intl);
+  const showPrice = true || displayPrice(listingTypeConfig);
+  // A job's amount is the compensation the company offers, saved to publicData
+  // as plain data. Fall back to the listing's own price for listings that were
+  // created before compensation existed.
+  const displayedPrice = moneyFromExtendedData(compensation) || price;
+  const { formattedPrice, priceTooltip } = priceData(displayedPrice, config.currency, intl);
 
   const isPriceVariationsInUse = isPriceVariationsEnabled(publicData, listingTypeConfig);
   const hasMultiplePriceVariants = isPriceVariationsInUse && publicData?.priceVariants?.length > 1;

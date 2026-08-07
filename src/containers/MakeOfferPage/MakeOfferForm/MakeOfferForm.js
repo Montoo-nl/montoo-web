@@ -4,47 +4,20 @@ import arrayMutators from 'final-form-arrays';
 import classNames from 'classnames';
 
 // Import contexts and util modules
-import appSettings from '../../../config/settings.js';
-import { types as sdkTypes } from '../../../util/sdkLoader.js';
 import { FormattedMessage, intlShape } from '../../../util/reactIntl.js';
-import { formatMoney } from '../../../util/currency.js';
 import { propTypes } from '../../../util/types.js';
-import * as validators from '../../../util/validators.js';
 import { getPropsForCustomTransactionFieldInputs } from '../../../util/fieldHelpers.js';
 
 // Import shared components
 import {
   CustomExtendedDataField,
-  FieldCurrencyInput,
   FieldTextInput,
   Form,
-  Heading,
   NamedLink,
   PrimaryButton,
 } from '../../../components/index.js';
 
 import css from './MakeOfferForm.module.css';
-
-const { Money } = sdkTypes;
-
-const getPriceValidators = (listingMinimumPriceSubUnits, marketplaceCurrency, intl) => {
-  const quoteRequiredMsgId = { id: 'MakeOfferPage.quoteRequired' };
-  const quoteRequiredMsg = intl.formatMessage(quoteRequiredMsgId);
-  const quoteRequired = validators.required(quoteRequiredMsg);
-
-  const minPriceRaw = new Money(listingMinimumPriceSubUnits, marketplaceCurrency);
-  const minPrice = formatMoney(intl, minPriceRaw);
-  const quoteTooLowMsgId = { id: 'MakeOfferPage.quoteTooLow' };
-  const quoteTooLowMsg = intl.formatMessage(quoteTooLowMsgId, { minPrice });
-  const minQuoteRequired = validators.moneySubUnitAmountAtLeast(
-    quoteTooLowMsg,
-    listingMinimumPriceSubUnits
-  );
-
-  return listingMinimumPriceSubUnits
-    ? validators.composeValidators(quoteRequired, minQuoteRequired)
-    : priceRequired;
-};
 
 const FinePrint = ({ stripeConnected }) => {
   if (stripeConnected) {
@@ -107,13 +80,6 @@ export const MakeOfferForm = props => {
     ...transactionFieldInitialValues,
   };
 
-  const marketplaceCurrency = config.currency;
-  const priceValidators = getPriceValidators(
-    config.listingMinimumPriceSubUnits,
-    marketplaceCurrency,
-    intl
-  );
-
   return (
     <FinalForm
       initialValues={initialValuesMaybe}
@@ -146,23 +112,9 @@ export const MakeOfferForm = props => {
         return (
           <Form className={classes} onSubmit={handleSubmit} enforcePagePreloadFor="SaleDetailsPage">
             <div className={css.section}>
-              <Heading as="label" htmlFor={`${formId}quote`} rootClassName={css.sectionHeading}>
-                <FormattedMessage id="MakeOfferPage.quoteLabel" values={{ authorDisplayName }} />
-              </Heading>
-
-              <FieldCurrencyInput
-                id={`${formId}quote`}
-                name="quote"
-                className={css.input}
-                placeholder={intl.formatMessage(
-                  {
-                    id: 'MakeOfferPage.quotePlaceholder',
-                  },
-                  { marketplaceCurrency }
-                )}
-                currencyConfig={appSettings.getCurrencyFormatting(marketplaceCurrency)}
-                validate={priceValidators}
-              />
+              {/* Note: the quote is not asked from the provider. It comes from
+                  the job's compensation through initialValues, and stays in the
+                  form values even though no field is registered for it. */}
 
               {hasTransactionFieldConfigs ? (
                 <div className={css.transactionFieldsContainer}>
