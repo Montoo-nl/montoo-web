@@ -1,16 +1,23 @@
-import React, { Component } from 'react';
+import React, { Component, useState } from 'react';
 import { compose } from 'redux';
 import { Field, Form as FinalForm } from 'react-final-form';
 import isEqual from 'lodash/isEqual';
 import classNames from 'classnames';
 import arrayMutators from 'final-form-arrays';
 
+import { useConfiguration } from '../../../context/configurationContext';
 import { FormattedMessage, injectIntl, intlShape } from '../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../util/data';
 import { propTypes } from '../../../util/types';
 import * as validators from '../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../util/errors';
 import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
+import {
+  certificateStoragePath,
+  getCertificateTypeOptions,
+  identityDocumentStoragePath,
+  insuranceDocumentStoragePath,
+} from '../../../config/configTechnician';
 
 import {
   Form,
@@ -18,6 +25,8 @@ import {
   Button,
   ImageFromFile,
   IconSpinner,
+  FieldCheckboxGroup,
+  FieldFileUpload,
   FieldTextInput,
   H4,
   CustomExtendedDataField,
@@ -75,6 +84,239 @@ const DisplayNameMaybe = props => {
 };
 
 /**
+ * Certificate uploads, one certification type at a time.
+ *
+ * The certifications a technician has already uploaded are listed first. Below
+ * them is a dropdown with the certification types that are still missing:
+ * picking one reveals an uploader, and once the file is in, the certification
+ * moves up to the list and its option is dropped from the dropdown.
+ *
+ * Values are stored under `certificates.<certificateType>` in the form.
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.options - Certification types as [{ key, label }]
+ * @param {Object} props.certificates - Current value of the 'certificates' form field
+ * @param {string} props.currentUserId - UUID of the current user, used in the storage path
+ * @param {Function} props.onUploadStateChange - Called with (fieldName, isUploading)
+ * @param {intlShape} props.intl - The intl object
+ * @returns {JSX.Element}
+ */
+const CertificateUploads = props => {
+  const { options, certificates, currentUserId, onUploadStateChange, intl } = props;
+  const [selectedType, setSelectedType] = useState('');
+  const [uploadingField, setUploadingField] = useState(null);
+
+  // Passed to the uploaders instead of onUploadStateChange, so that the missing
+  // document error can stay hidden while the file is on its way.
+  const handleUploadStateChange = (fieldName, isUploading) => {
+    setUploadingField(current =>
+      isUploading ? fieldName : current === fieldName ? null : current
+    );
+    onUploadStateChange(fieldName, isUploading);
+  };
+
+  const hasFile = certificateType => !!certificates?.[certificateType]?.url;
+  const addedOptions = options.filter(o => hasFile(o.key));
+  const availableOptions = options.filter(o => !hasFile(o.key));
+
+  // The upload of the selected type has finished: it is part of addedOptions
+  // now, so reset the dropdown and let the technician pick the next one.
+  if (selectedType && hasFile(selectedType)) {
+    setSelectedType('');
+  }
+  const pendingOption = availableOptions.find(o => o.key === selectedType);
+  const certificateFileRequired = validators.required(
+    intl.formatMessage({ id: 'ProfileSettingsForm.certificateFileRequired' })
+  );
+
+  // Certifications as a whole are optional, but picking one from the dropdown
+  // is a promise to upload its document: the field is required for as long as
+  // the certification is selected, which keeps the form from being submitted.
+  const renderUpload = ({ key, label }, validate) => (
+    <FieldFileUpload
+      key={key}
+      id={`certificates.${key}`}
+      name={`certificates.${key}`}
+      label={label}
+      hint={intl.formatMessage({ id: 'ProfileSettingsForm.documentFileInfo' })}
+      storagePath={certificateStoragePath(currentUserId, key)}
+      onUploadStateChange={handleUploadStateChange}
+      validate={validate}
+    />
+  );
+
+  return (
+    <>
+      {/* Note: not `.map(renderUpload)` - that would pass the array index as
+          the second argument, i.e. as the validate function. */}
+      {addedOptions.map(option => renderUpload(option))}
+
+      {availableOptions.length > 0 ? (
+        <div className={css.certificatePicker}>
+          <label htmlFor="certificateTypeToAdd">
+            <FormattedMessage id="ProfileSettingsForm.certificateTypeLabel" />
+          </label>
+          <select
+            id="certificateTypeToAdd"
+            value={selectedType}
+            onChange={e => setSelectedType(e.target.value)}
+          >
+            <option value="">
+              {intl.formatMessage({ id: 'ProfileSettingsForm.certificateTypePlaceholder' })}
+            </option>
+            {availableOptions.map(({ key, label }) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          {pendingOption ? (
+            <>
+              {renderUpload(pendingOption, certificateFileRequired)}
+              <div className={css.pendingCertificateActions}>
+                <button
+                  className={css.clearCertificate}
+                  type="button"
+                  onClick={() => setSelectedType('')}
+                >
+                  <FormattedMessage id="ProfileSettingsForm.certificateClear" />
+                </button>
+                {uploadingField === `certificates.${pendingOption.key}` ? null : (
+                  <span className={css.certificateError}>
+                    <FormattedMessage id="ProfileSettingsForm.certificateFileRequired" />
+                  </span>
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  );
+};
+
+/**
+ * Profile information that is only asked from technicians (i.e. users whose
+ * user type has the 'provider' role). Companies don't see this section.
+ *
+ * The service area and specialisations end up in publicData, so that companies
+ * can see them. The uploaded documents end up in protectedData.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isTechnician - Whether the current user has the provider role
+ * @param {string} props.currentUserId - UUID of the current user, used in the storage path
+ * @param {Object} props.values - Current form values
+ * @param {Function} props.onUploadStateChange - Called with (fieldName, isUploading)
+ * @param {intlShape} props.intl - The intl object
+ * @returns {JSX.Element|null}
+ */
+const TechnicianDetailsMaybe = props => {
+  const { isTechnician, currentUserId, values, onUploadStateChange, intl } = props;
+  const config = useConfiguration();
+
+  if (!isTechnician || !currentUserId) {
+    return null;
+  }
+
+  // Technicians pick their specialisations from the top-level listing
+  // categories, and their certifications from the 'certifications' listing
+  // field, so that both line up with the jobs companies post. Only the ids are
+  // stored - the names are read from the config every time they are shown.
+  const specialisationOptions = (config.categoryConfiguration?.categories || [])
+    .filter(category => category?.id != null)
+    .map(category => ({
+      key: `${category.id}`,
+      label: category.name || `${category.id}`,
+    }));
+  const certificateOptions = getCertificateTypeOptions(config);
+
+  const documentFileInfo = intl.formatMessage({ id: 'ProfileSettingsForm.documentFileInfo' });
+  const identityDocumentRequired = validators.required(
+    intl.formatMessage({ id: 'ProfileSettingsForm.identityDocumentRequired' })
+  );
+
+  return (
+    <>
+      <div className={css.sectionContainer}>
+        <H4 as="h2" className={css.sectionTitle}>
+          <FormattedMessage id="ProfileSettingsForm.serviceAreaHeading" />
+        </H4>
+        <FieldTextInput
+          type="textarea"
+          id="serviceArea"
+          name="serviceArea"
+          label={intl.formatMessage({ id: 'ProfileSettingsForm.serviceAreaLabel' })}
+          placeholder={intl.formatMessage({ id: 'ProfileSettingsForm.serviceAreaPlaceholder' })}
+        />
+      </div>
+
+      {specialisationOptions.length > 0 ? (
+        <div className={css.sectionContainer}>
+          <H4 as="h2" className={css.sectionTitle}>
+            <FormattedMessage id="ProfileSettingsForm.specialisationsHeading" />
+          </H4>
+          <FieldCheckboxGroup
+            id="specialisations"
+            name="specialisations"
+            options={specialisationOptions}
+            twoColumns
+          />
+          <p className={css.extraInfo}>
+            <FormattedMessage id="ProfileSettingsForm.specialisationsInfo" />
+          </p>
+        </div>
+      ) : null}
+
+      <div className={css.sectionContainer}>
+        <H4 as="h2" className={css.sectionTitle}>
+          <FormattedMessage id="ProfileSettingsForm.documentsHeading" />
+        </H4>
+        <p className={css.documentsInfo}>
+          <FormattedMessage id="ProfileSettingsForm.documentsInfo" />
+        </p>
+        <FieldFileUpload
+          id="identityDocument"
+          name="identityDocument"
+          label={intl.formatMessage({ id: 'ProfileSettingsForm.identityDocumentLabel' })}
+          hint={documentFileInfo}
+          isRequired
+          validate={identityDocumentRequired}
+          storagePath={identityDocumentStoragePath(currentUserId)}
+          onUploadStateChange={onUploadStateChange}
+        />
+        <FieldFileUpload
+          id="insuranceDocument"
+          name="insuranceDocument"
+          label={intl.formatMessage({ id: 'ProfileSettingsForm.insuranceDocumentLabel' })}
+          hint={documentFileInfo}
+          storagePath={insuranceDocumentStoragePath(currentUserId)}
+          onUploadStateChange={onUploadStateChange}
+        />
+      </div>
+
+      {certificateOptions.length > 0 ? (
+        <div className={css.sectionContainer}>
+          <H4 as="h2" className={css.sectionTitle}>
+            <FormattedMessage id="ProfileSettingsForm.certificatesHeading" />
+          </H4>
+          <p className={css.documentsInfo}>
+            <FormattedMessage id="ProfileSettingsForm.certificatesInfo" />
+          </p>
+          <CertificateUploads
+            options={certificateOptions}
+            certificates={values?.certificates}
+            currentUserId={currentUserId}
+            onUploadStateChange={onUploadStateChange}
+            intl={intl}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+};
+
+/**
  * ProfileSettingsForm
  * TODO: change to functional component
  *
@@ -87,6 +329,8 @@ const DisplayNameMaybe = props => {
  * @param {Object} props.userTypeConfig - The user type config
  * @param {string} props.userTypeConfig.userType - The user type
  * @param {Array<Object>} props.userFields - The user fields
+ * @param {boolean} [props.isTechnician] - Whether the current user has the 'provider' role.
+ * Technicians are additionally asked for their service area, specialisations and documents.
  * @param {Object} [props.profileImage] - The profile image
  * @param {string} props.marketplaceName - The marketplace name
  * @param {Function} props.onImageUpload - The function to handle image upload
@@ -103,8 +347,19 @@ class ProfileSettingsFormComponent extends Component {
     super(props);
 
     this.uploadDelayTimeoutId = null;
-    this.state = { uploadDelay: false };
+    this.state = { uploadDelay: false, filesInProgress: [] };
     this.submittedValues = {};
+    this.handleFileUploadStateChange = this.handleFileUploadStateChange.bind(this);
+  }
+
+  // Keeps track of the document uploads that are still in flight, so that the
+  // form can't be submitted before their URLs have been stored as field values.
+  handleFileUploadStateChange(fieldName, isUploading) {
+    this.setState(prevState => {
+      const others = prevState.filesInProgress.filter(name => name !== fieldName);
+      const filesInProgress = isUploading ? [...others, fieldName] : others;
+      return isEqual(filesInProgress, prevState.filesInProgress) ? null : { filesInProgress };
+    });
   }
 
   componentDidUpdate(prevProps) {
@@ -148,6 +403,7 @@ class ProfileSettingsFormComponent extends Component {
             values,
             userFields,
             userTypeConfig,
+            isTechnician,
           } = fieldRenderProps;
 
           const user = ensureCurrentUser(currentUser);
@@ -260,8 +516,14 @@ class ProfileSettingsFormComponent extends Component {
           const submitInProgress = updateInProgress;
           const submittedOnce = Object.keys(this.submittedValues).length > 0;
           const pristineSinceLastSubmit = submittedOnce && isEqual(values, this.submittedValues);
+          const documentUploadInProgress = this.state.filesInProgress.length > 0;
           const submitDisabled =
-            invalid || pristine || pristineSinceLastSubmit || uploadInProgress || submitInProgress;
+            invalid ||
+            pristine ||
+            pristineSinceLastSubmit ||
+            uploadInProgress ||
+            documentUploadInProgress ||
+            submitInProgress;
 
           const userFieldProps = getPropsForCustomUserFieldInputs(
             userFields,
@@ -389,6 +651,14 @@ class ProfileSettingsFormComponent extends Component {
                   <FormattedMessage id="ProfileSettingsForm.bioInfo" values={{ marketplaceName }} />
                 </p>
               </div>
+              <TechnicianDetailsMaybe
+                isTechnician={isTechnician}
+                currentUserId={user.id?.uuid}
+                values={values}
+                onUploadStateChange={this.handleFileUploadStateChange}
+                intl={intl}
+              />
+
               <div className={classNames(css.sectionContainer, css.lastSection)}>
                 {userFieldProps.map(({ key, ...fieldProps }) => (
                   <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />

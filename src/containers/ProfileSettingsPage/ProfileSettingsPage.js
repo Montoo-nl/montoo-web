@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
 
@@ -8,17 +8,23 @@ import { propTypes } from '../../util/types';
 import { PROFILE_PAGE_PENDING_APPROVAL_VARIANT } from '../../util/urlHelpers';
 import { ensureCurrentUser } from '../../util/data';
 import {
+  getCurrentUserTypeRoles,
+  hasPermissionToInitiateTransactions,
+  hasPermissionToPostListings,
+  hasPermissionToViewData,
   initialValuesForUserFields,
   isUserAuthorized,
   pickUserFieldsData,
   showCreateListingLinkForUser,
 } from '../../util/userHelpers';
-import { isScrollingDisabled } from '../../ducks/ui.duck';
+import { isScrollingDisabled, manageDisableScrolling } from '../../ducks/ui.duck';
 
-import { H3, Page, UserNav, NamedLink, LayoutSingleColumn } from '../../components';
+import { H3, H4, Modal, Page, UserNav, NamedLink, LayoutSingleColumn } from '../../components';
 
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
+
+import { getCertificateTypeOptions } from '../../config/configTechnician';
 
 import ProfileSettingsForm from './ProfileSettingsForm/ProfileSettingsForm';
 
@@ -30,6 +36,124 @@ const onImageUploadHandler = (values, fn) => {
   if (file) {
     fn({ id, imageId, file });
   }
+};
+
+// Drop the certificate slots that don't have an uploaded file. The whole
+// 'certificates' object is replaced on save, so leaving empty entries out keeps
+// the stored data clean. Returns null when the technician has no certificates.
+const pickUploadedCertificates = (certificates, certificateTypeOptions) => {
+  const uploaded = certificateTypeOptions.reduce((picked, { key }) => {
+    const file = certificates?.[key];
+    return file?.url ? { ...picked, [key]: file } : picked;
+  }, {});
+
+  return Object.keys(uploaded).length > 0 ? uploaded : null;
+};
+
+// A user whose profile hasn't been approved yet. The other states are 'active'
+// and 'banned'.
+const USER_STATE_PENDING_APPROVAL = 'pendingApproval';
+
+// The permissions granted to the currentUser, as they are listed in the modal
+// below. They come from the currentUser's effectivePermissionSet relationship.
+const PERMISSION_ROWS = [
+  {
+    key: 'read',
+    labelId: 'ProfileSettingsPage.permissionRead',
+    hasPermission: hasPermissionToViewData,
+  },
+  {
+    key: 'postListings',
+    labelId: 'ProfileSettingsPage.permissionPostListings',
+    hasPermission: hasPermissionToPostListings,
+  },
+  {
+    key: 'initiateTransactions',
+    labelId: 'ProfileSettingsPage.permissionInitiateTransactions',
+    hasPermission: hasPermissionToInitiateTransactions,
+  },
+];
+
+/**
+ * Tells the user that their profile hasn't been approved yet, and what they can
+ * and can't do in the meantime. Technicians land here after saving their
+ * details for the first time: their profile goes to review, and until it is
+ * approved the marketplace doesn't grant them read permission.
+ *
+ * @param {Object} props
+ * @param {propTypes.currentUser} props.currentUser - The current user
+ * @param {boolean} props.isOpen - Whether the modal is open
+ * @param {Function} props.onClose - Called when the modal is closed
+ * @param {Function} props.onManageDisableScrolling - Called to disable/enable scrolling
+ * @returns {JSX.Element}
+ */
+const PendingApprovalModal = props => {
+  const { currentUser, isOpen, onClose, onManageDisableScrolling } = props;
+
+  const { email, emailVerified: isEmailVerified } = currentUser?.attributes || {};
+
+  const permissions = PERMISSION_ROWS.map(row => ({
+    ...row,
+    isAllowed: row.hasPermission(currentUser),
+  }));
+  // Approval doesn't necessarily restrict anything: if the marketplace grants
+  // every permission up front, there is nothing to list.
+  const hasRestrictedPermissions = permissions.some(p => !p.isAllowed);
+
+  return (
+    <Modal
+      id="ProfileSettingsPage.pendingApproval"
+      isOpen={isOpen}
+      onClose={onClose}
+      onManageDisableScrolling={onManageDisableScrolling}
+      usePortal
+    >
+      <H4 as="h2" className={css.modalTitle}>
+        <FormattedMessage id="ProfileSettingsPage.pendingApprovalTitle" />
+      </H4>
+      <p className={css.modalMessage}>
+        <FormattedMessage
+          id={
+            hasRestrictedPermissions
+              ? 'ProfileSettingsPage.pendingApprovalMessageWithPermissions'
+              : 'ProfileSettingsPage.pendingApprovalMessage'
+          }
+        />
+      </p>
+
+      {hasRestrictedPermissions ? (
+        <ul className={css.permissionList}>
+          {permissions.map(({ key, labelId, isAllowed }) => (
+            <li key={key} className={css.permissionRow}>
+              <FormattedMessage id={labelId} />
+              <span className={isAllowed ? css.permissionAllowed : css.permissionPending}>
+                <FormattedMessage
+                  id={
+                    isAllowed
+                      ? 'ProfileSettingsPage.permissionAllowed'
+                      : 'ProfileSettingsPage.permissionPending'
+                  }
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {/* The approval notice is sent by email, which never arrives if the
+          address hasn't been verified. */}
+      <p className={isEmailVerified ? css.emailNote : css.emailWarning}>
+        <FormattedMessage
+          id={
+            isEmailVerified
+              ? 'ProfileSettingsPage.pendingApprovalEmailNote'
+              : 'ProfileSettingsPage.pendingApprovalEmailUnverified'
+          }
+          values={{ email: <strong>{email}</strong> }}
+        />
+      </p>
+    </Modal>
+  );
 };
 
 const ViewProfileLink = props => {
@@ -61,6 +185,7 @@ const ViewProfileLink = props => {
  * @param {File} props.image.file - The image file
  * @param {propTypes.image} props.image.uploadedImage - The uploaded image
  * @param {Function} props.onImageUpload - The image upload function
+ * @param {Function} props.onManageDisableScrolling - Disables/enables scrolling for the modal
  * @param {Function} props.onUpdateProfile - The update profile function
  * @param {boolean} props.scrollingDisabled - Whether the scrolling is disabled
  * @param {boolean} props.updateInProgress - Whether the update is in progress
@@ -76,6 +201,8 @@ export const ProfileSettingsPageComponent = props => {
     currentUser,
     image,
     onImageUpload,
+    // Modal needs this, but the page also renders fine without scroll locking
+    onManageDisableScrolling = () => {},
     onUpdateProfile,
     scrollingDisabled,
     updateInProgress,
@@ -87,8 +214,50 @@ export const ProfileSettingsPageComponent = props => {
   const { userFields, userTypes = [] } = config.user;
   const publicUserFields = userFields.filter(uf => uf.scope === 'public');
 
+  // Technicians (the 'provider' role) are asked for their service area,
+  // specialisations and documents. Companies (the 'customer' role) are not.
+  const { provider: isTechnician } = getCurrentUserTypeRoles(config, currentUser);
+
+  // A technician saving their profile sets privateData.profileSubmitted, which
+  // marks the point where the profile went to review. From then on the modal is
+  // shown every time this page is opened, and again after every save, until the
+  // marketplace has approved them. Companies never get the flag, so they never
+  // see the modal.
+  const currentUserId = currentUser?.id?.uuid;
+  const isPendingApproval = currentUser?.attributes?.state === USER_STATE_PENDING_APPROVAL;
+  const isProfileSubmitted = currentUser?.attributes?.profile?.privateData?.profileSubmitted;
+  const showPendingApprovalModal = isPendingApproval && !!isProfileSubmitted;
+  const [isPendingApprovalModalOpen, setIsPendingApprovalModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUserId && showPendingApprovalModal) {
+      setIsPendingApprovalModalOpen(true);
+    }
+  }, [currentUserId, showPendingApprovalModal]);
+
+  const wasUpdateInProgress = useRef(updateInProgress);
+  useEffect(() => {
+    const updateJustFinished = wasUpdateInProgress.current && !updateInProgress;
+    wasUpdateInProgress.current = updateInProgress;
+
+    if (updateJustFinished && !updateProfileError && showPendingApprovalModal) {
+      setIsPendingApprovalModalOpen(true);
+    }
+  }, [updateInProgress, updateProfileError, showPendingApprovalModal]);
+
   const handleSubmit = (values, userType) => {
-    const { firstName, lastName, displayName, bio: rawBio, ...rest } = values;
+    const {
+      firstName,
+      lastName,
+      displayName,
+      bio: rawBio,
+      serviceArea,
+      specialisations,
+      identityDocument,
+      insuranceDocument,
+      certificates,
+      ...rest
+    } = values;
 
     const displayNameMaybe = displayName
       ? { displayName: displayName.trim() }
@@ -97,6 +266,29 @@ export const ProfileSettingsPageComponent = props => {
     // Ensure that the optional bio is a string
     const bio = rawBio || '';
 
+    // Service area and specialisations are public, so that companies can see
+    // them. The documents themselves are only shared with transaction parties.
+    const technicianPublicDataMaybe = isTechnician
+      ? {
+          serviceArea: serviceArea?.trim() || null,
+          specialisations: specialisations?.length > 0 ? specialisations : null,
+        }
+      : {};
+    const technicianProtectedDataMaybe = isTechnician
+      ? {
+          protectedData: {
+            identityDocument: identityDocument || null,
+            insuranceDocument: insuranceDocument || null,
+            certificates: pickUploadedCertificates(certificates, getCertificateTypeOptions(config)),
+          },
+        }
+      : {};
+    // Marks that the technician has sent their details in for review at least
+    // once. Only technicians go through the approval phase for now.
+    const technicianPrivateDataMaybe = isTechnician
+      ? { privateData: { profileSubmitted: true } }
+      : {};
+
     const profile = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -104,7 +296,10 @@ export const ProfileSettingsPageComponent = props => {
       bio,
       publicData: {
         ...pickUserFieldsData(rest, 'public', userType, userFields),
+        ...technicianPublicDataMaybe,
       },
+      ...technicianPrivateDataMaybe,
+      ...technicianProtectedDataMaybe,
     };
     const uploadedImage = props.image;
 
@@ -118,7 +313,14 @@ export const ProfileSettingsPageComponent = props => {
   };
 
   const user = ensureCurrentUser(currentUser);
-  const { firstName, lastName, displayName, bio, publicData } = user?.attributes.profile;
+  const {
+    firstName,
+    lastName,
+    displayName,
+    bio,
+    publicData,
+    protectedData,
+  } = user?.attributes.profile;
   // I.e. the status is active, not pending-approval or banned
   const isUnauthorizedUser = currentUser && !isUserAuthorized(currentUser);
 
@@ -129,6 +331,19 @@ export const ProfileSettingsPageComponent = props => {
   const isDisplayNameIncluded = userTypeConfig?.defaultUserFields?.displayName !== false;
   // ProfileSettingsForm decides if it's allowed to show the input field.
   const displayNameMaybe = isDisplayNameIncluded && displayName ? { displayName } : {};
+
+  // Note: these are intentionally left undefined when the user hasn't saved
+  // anything yet. Creating new objects/arrays here on every render would make
+  // Final Form reinitialize the form and discard the user's input.
+  const technicianInitialValuesMaybe = isTechnician
+    ? {
+        serviceArea: publicData?.serviceArea,
+        specialisations: publicData?.specialisations,
+        identityDocument: protectedData?.identityDocument,
+        insuranceDocument: protectedData?.insuranceDocument,
+        certificates: protectedData?.certificates,
+      }
+    : {};
 
   const profileSettingsForm = user.id ? (
     <ProfileSettingsForm
@@ -141,6 +356,7 @@ export const ProfileSettingsPageComponent = props => {
         bio,
         profileImage: user.profileImage,
         ...initialValuesForUserFields(publicData, 'public', userType, userFields),
+        ...technicianInitialValuesMaybe,
       }}
       profileImage={profileImage}
       onImageUpload={e => onImageUploadHandler(e, onImageUpload)}
@@ -152,6 +368,7 @@ export const ProfileSettingsPageComponent = props => {
       marketplaceName={config.marketplaceName}
       userFields={publicUserFields}
       userTypeConfig={userTypeConfig}
+      isTechnician={isTechnician}
     />
   ) : null;
 
@@ -182,6 +399,13 @@ export const ProfileSettingsPageComponent = props => {
             <ViewProfileLink userUUID={user?.id?.uuid} isUnauthorizedUser={isUnauthorizedUser} />
           </div>
           {profileSettingsForm}
+
+          <PendingApprovalModal
+            currentUser={currentUser}
+            isOpen={isPendingApprovalModalOpen}
+            onClose={() => setIsPendingApprovalModalOpen(false)}
+            onManageDisableScrolling={onManageDisableScrolling}
+          />
         </div>
       </LayoutSingleColumn>
     </Page>
@@ -210,6 +434,8 @@ const mapStateToProps = state => {
 
 const mapDispatchToProps = dispatch => ({
   onImageUpload: data => dispatch(uploadImage(data)),
+  onManageDisableScrolling: (componentId, disableScrolling) =>
+    dispatch(manageDisableScrolling(componentId, disableScrolling)),
   onUpdateProfile: data => dispatch(updateProfile(data)),
 });
 

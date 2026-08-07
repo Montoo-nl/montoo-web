@@ -277,6 +277,67 @@
   }
 }
 
+/* Intro text of the technician document sections. Unlike .extraInfo, this is
+   shown above the fields, so the margins are flipped. */
+.documentsInfo {
+  composes: textSmall from global;
+  color: var(--colorGrey600);
+  margin-top: 0;
+  margin-bottom: 16px;
+
+  @media (--viewportMedium) {
+    margin-bottom: 24px;
+  }
+}
+
+/* Dropdown for adding one more certification, and the uploader it reveals
+   right below it.
+   Note: the selector is compound on purpose - it has to win over the uploader's
+   own .root class, whose order in the bundle isn't guaranteed. */
+.certificatePicker > select {
+  margin-bottom: 0;
+}
+
+.certificatePicker > select + * {
+  margin-top: 24px;
+  padding-top: 0;
+}
+
+/* Sits under the uploader the dropdown revealed. The negative margin pulls it
+   against that uploader, which carries a 24px bottom margin of its own. */
+.pendingCertificateActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-top: -16px;
+}
+
+.clearCertificate {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--colorGrey700);
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--colorBlack);
+  }
+}
+
+/* Shown while a certification is selected but its document is still missing */
+.certificateError {
+  font-size: 13px;
+  line-height: 18px;
+  margin: 0;
+  color: var(--colorFail);
+}
+
 .submitButton {
   margin-top: 24px;
   margin-bottom: 56px;
