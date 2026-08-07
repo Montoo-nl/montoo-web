@@ -290,6 +290,14 @@
   }
 }
 
+.companyField {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
 /* Dropdown for adding one more certification, and the uploader it reveals
    right below it.
    Note: the selector is compound on purpose - it has to win over the uploader's

@@ -54,6 +54,33 @@ const pickUploadedCertificates = (certificates, certificateTypeOptions) => {
 // and 'banned'.
 const USER_STATE_PENDING_APPROVAL = 'pendingApproval';
 
+// The business details asked from companies. The keys are used both as form
+// field names and as keys in the user's protectedData.
+// Note: kept in sync with the fields rendered by CompanyDetailsMaybe in
+// ProfileSettingsForm.
+const COMPANY_DETAIL_KEYS = [
+  'companyName',
+  'contactPerson',
+  'chamberOfCommerceNumber',
+  'vatNumber',
+  'businessAddress',
+  'companyPhone',
+  'companyEmail',
+  'companyWebsite',
+];
+
+// Trimmed company details, ready to be saved as protected data.
+const pickCompanyDetails = values =>
+  COMPANY_DETAIL_KEYS.reduce((picked, key) => {
+    const value = values[key];
+    return { ...picked, [key]: typeof value === 'string' ? value.trim() : value || null };
+  }, {});
+
+// Company details as form initial values. Undefined when nothing is saved yet,
+// so that Final Form doesn't reinitialize on every render.
+const companyDetailInitialValues = protectedData =>
+  COMPANY_DETAIL_KEYS.reduce((values, key) => ({ ...values, [key]: protectedData?.[key] }), {});
+
 // The permissions granted to the currentUser, as they are listed in the modal
 // below. They come from the currentUser's effectivePermissionSet relationship.
 const PERMISSION_ROWS = [
@@ -75,20 +102,22 @@ const PERMISSION_ROWS = [
 ];
 
 /**
- * Tells the user that their profile hasn't been approved yet, and what they can
- * and can't do in the meantime. Technicians land here after saving their
- * details for the first time: their profile goes to review, and until it is
- * approved the marketplace doesn't grant them read permission.
+ * Tells the user that their profile hasn't been approved yet. Both technicians
+ * and companies land here after saving their details for the first time: the
+ * profile goes to review, and what they came to the marketplace to do only
+ * opens up once an admin has approved them.
  *
  * @param {Object} props
  * @param {propTypes.currentUser} props.currentUser - The current user
+ * @param {boolean} props.isCompany - Whether the user has the 'customer' role.
+ * Companies create jobs, technicians apply to them.
  * @param {boolean} props.isOpen - Whether the modal is open
  * @param {Function} props.onClose - Called when the modal is closed
  * @param {Function} props.onManageDisableScrolling - Called to disable/enable scrolling
  * @returns {JSX.Element}
  */
 const PendingApprovalModal = props => {
-  const { currentUser, isOpen, onClose, onManageDisableScrolling } = props;
+  const { currentUser, isCompany, isOpen, onClose, onManageDisableScrolling } = props;
 
   const { email, emailVerified: isEmailVerified } = currentUser?.attributes || {};
 
@@ -114,9 +143,9 @@ const PendingApprovalModal = props => {
       <p className={css.modalMessage}>
         <FormattedMessage
           id={
-            hasRestrictedPermissions
-              ? 'ProfileSettingsPage.pendingApprovalMessageWithPermissions'
-              : 'ProfileSettingsPage.pendingApprovalMessage'
+            isCompany
+              ? 'ProfileSettingsPage.pendingApprovalMessageCompany'
+              : 'ProfileSettingsPage.pendingApprovalMessageTechnician'
           }
         />
       </p>
@@ -215,18 +244,22 @@ export const ProfileSettingsPageComponent = props => {
   const publicUserFields = userFields.filter(uf => uf.scope === 'public');
 
   // Technicians (the 'provider' role) are asked for their service area,
-  // specialisations and documents. Companies (the 'customer' role) are not.
-  const { provider: isTechnician } = getCurrentUserTypeRoles(config, currentUser);
+  // specialisations and documents. Companies (the 'customer' role) are asked
+  // for their business details instead.
+  const { provider: isTechnician, customer: isCompany } = getCurrentUserTypeRoles(
+    config,
+    currentUser
+  );
 
-  // A technician saving their profile sets privateData.profileSubmitted, which
-  // marks the point where the profile went to review. From then on the modal is
-  // shown every time this page is opened, and again after every save, until the
-  // marketplace has approved them. Companies never get the flag, so they never
-  // see the modal.
   const currentUserId = currentUser?.id?.uuid;
   const isPendingApproval = currentUser?.attributes?.state === USER_STATE_PENDING_APPROVAL;
-  const isProfileSubmitted = currentUser?.attributes?.profile?.privateData?.profileSubmitted;
-  const showPendingApprovalModal = isPendingApproval && !!isProfileSubmitted;
+  const isProfileSubmitted = !!currentUser?.attributes?.profile?.privateData?.profileSubmitted;
+
+  // Saving the profile sets privateData.profileSubmitted, which marks the point
+  // where the profile went to review. From then on the modal is shown every
+  // time this page is opened, and again after every save, until the marketplace
+  // has approved the user. Technicians and companies alike.
+  const showPendingApprovalModal = isPendingApproval && isProfileSubmitted;
   const [isPendingApprovalModalOpen, setIsPendingApprovalModalOpen] = useState(false);
 
   useEffect(() => {
@@ -276,18 +309,23 @@ export const ProfileSettingsPageComponent = props => {
       : {};
     const technicianProtectedDataMaybe = isTechnician
       ? {
-          protectedData: {
-            identityDocument: identityDocument || null,
-            insuranceDocument: insuranceDocument || null,
-            certificates: pickUploadedCertificates(certificates, getCertificateTypeOptions(config)),
-          },
+          identityDocument: identityDocument || null,
+          insuranceDocument: insuranceDocument || null,
+          certificates: pickUploadedCertificates(certificates, getCertificateTypeOptions(config)),
         }
       : {};
-    // Marks that the technician has sent their details in for review at least
-    // once. Only technicians go through the approval phase for now.
-    const technicianPrivateDataMaybe = isTechnician
-      ? { privateData: { profileSubmitted: true } }
-      : {};
+    // A company's business details. They are required in the form, so they are
+    // always filled in by the time this runs.
+    const companyProtectedDataMaybe = isCompany ? pickCompanyDetails(rest) : {};
+
+    const protectedData = { ...technicianProtectedDataMaybe, ...companyProtectedDataMaybe };
+    const protectedDataMaybe = Object.keys(protectedData).length > 0 ? { protectedData } : {};
+
+    // Marks that the user has sent their details in at least once. Technicians
+    // use it to know their profile is in review, companies to know whether they
+    // have already been pointed to the new job page.
+    const privateDataMaybe =
+      isTechnician || isCompany ? { privateData: { profileSubmitted: true } } : {};
 
     const profile = {
       firstName: firstName.trim(),
@@ -298,8 +336,8 @@ export const ProfileSettingsPageComponent = props => {
         ...pickUserFieldsData(rest, 'public', userType, userFields),
         ...technicianPublicDataMaybe,
       },
-      ...technicianPrivateDataMaybe,
-      ...technicianProtectedDataMaybe,
+      ...privateDataMaybe,
+      ...protectedDataMaybe,
     };
     const uploadedImage = props.image;
 
@@ -344,6 +382,7 @@ export const ProfileSettingsPageComponent = props => {
         certificates: protectedData?.certificates,
       }
     : {};
+  const companyInitialValuesMaybe = isCompany ? companyDetailInitialValues(protectedData) : {};
 
   const profileSettingsForm = user.id ? (
     <ProfileSettingsForm
@@ -357,6 +396,7 @@ export const ProfileSettingsPageComponent = props => {
         profileImage: user.profileImage,
         ...initialValuesForUserFields(publicData, 'public', userType, userFields),
         ...technicianInitialValuesMaybe,
+        ...companyInitialValuesMaybe,
       }}
       profileImage={profileImage}
       onImageUpload={e => onImageUploadHandler(e, onImageUpload)}
@@ -369,6 +409,7 @@ export const ProfileSettingsPageComponent = props => {
       userFields={publicUserFields}
       userTypeConfig={userTypeConfig}
       isTechnician={isTechnician}
+      isCompany={isCompany}
     />
   ) : null;
 
@@ -402,6 +443,7 @@ export const ProfileSettingsPageComponent = props => {
 
           <PendingApprovalModal
             currentUser={currentUser}
+            isCompany={isCompany}
             isOpen={isPendingApprovalModalOpen}
             onClose={() => setIsPendingApprovalModalOpen(false)}
             onManageDisableScrolling={onManageDisableScrolling}

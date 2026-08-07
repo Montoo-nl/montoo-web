@@ -197,6 +197,82 @@ const CertificateUploads = props => {
 };
 
 /**
+ * Business details that are only asked from companies (i.e. users whose user
+ * type has the 'customer' role). Technicians don't see this section.
+ *
+ * Everything here goes to protectedData, and all of it is required for now.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isCompany - Whether the current user has the customer role
+ * @param {intlShape} props.intl - The intl object
+ * @returns {JSX.Element|null}
+ */
+const CompanyDetailsMaybe = props => {
+  const { isCompany, intl } = props;
+
+  if (!isCompany) {
+    return null;
+  }
+
+  const requiredMessage = intl.formatMessage({ id: 'ProfileSettingsForm.companyFieldRequired' });
+  const isRequired = validators.required(requiredMessage);
+
+  // key: form field name, which is also the key used in protectedData
+  const textFields = [
+    { key: 'companyName', type: 'text' },
+    { key: 'contactPerson', type: 'text' },
+    { key: 'chamberOfCommerceNumber', type: 'text' },
+    { key: 'vatNumber', type: 'text' },
+    { key: 'businessAddress', type: 'text' },
+    { key: 'companyPhone', type: 'text' },
+    {
+      key: 'companyEmail',
+      type: 'email',
+      validate: validators.composeValidators(
+        isRequired,
+        validators.emailFormatValid(
+          intl.formatMessage({ id: 'ProfileSettingsForm.companyEmailInvalid' })
+        )
+      ),
+    },
+    {
+      key: 'companyWebsite',
+      type: 'text',
+      validate: validators.composeValidators(
+        isRequired,
+        validators.validBusinessURL(
+          intl.formatMessage({ id: 'ProfileSettingsForm.companyWebsiteInvalid' })
+        )
+      ),
+    },
+  ];
+
+  return (
+    <div className={css.sectionContainer}>
+      <H4 as="h2" className={css.sectionTitle}>
+        <FormattedMessage id="ProfileSettingsForm.companyDetailsHeading" />
+      </H4>
+      <p className={css.documentsInfo}>
+        <FormattedMessage id="ProfileSettingsForm.companyDetailsInfo" />
+      </p>
+
+      {textFields.map(({ key, type, validate }) => (
+        <FieldTextInput
+          key={key}
+          className={css.companyField}
+          type={type}
+          id={key}
+          name={key}
+          label={intl.formatMessage({ id: `ProfileSettingsForm.${key}Label` })}
+          placeholder={intl.formatMessage({ id: `ProfileSettingsForm.${key}Placeholder` })}
+          validate={validate || isRequired}
+        />
+      ))}
+    </div>
+  );
+};
+
+/**
  * Profile information that is only asked from technicians (i.e. users whose
  * user type has the 'provider' role). Companies don't see this section.
  *
@@ -331,6 +407,8 @@ const TechnicianDetailsMaybe = props => {
  * @param {Array<Object>} props.userFields - The user fields
  * @param {boolean} [props.isTechnician] - Whether the current user has the 'provider' role.
  * Technicians are additionally asked for their service area, specialisations and documents.
+ * @param {boolean} [props.isCompany] - Whether the current user has the 'customer' role.
+ * Companies are additionally asked for their business details.
  * @param {Object} [props.profileImage] - The profile image
  * @param {string} props.marketplaceName - The marketplace name
  * @param {Function} props.onImageUpload - The function to handle image upload
@@ -404,6 +482,7 @@ class ProfileSettingsFormComponent extends Component {
             userFields,
             userTypeConfig,
             isTechnician,
+            isCompany,
           } = fieldRenderProps;
 
           const user = ensureCurrentUser(currentUser);
@@ -651,6 +730,8 @@ class ProfileSettingsFormComponent extends Component {
                   <FormattedMessage id="ProfileSettingsForm.bioInfo" values={{ marketplaceName }} />
                 </p>
               </div>
+              <CompanyDetailsMaybe isCompany={isCompany} intl={intl} />
+
               <TechnicianDetailsMaybe
                 isTechnician={isTechnician}
                 currentUserId={user.id?.uuid}

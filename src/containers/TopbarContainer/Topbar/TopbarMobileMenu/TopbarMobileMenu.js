@@ -5,9 +5,11 @@
 import React from 'react';
 import classNames from 'classnames';
 
+import { useConfiguration } from '../../../../context/configurationContext';
 import { ACCOUNT_SETTINGS_PAGES } from '../../../../routing/routeConfiguration';
 import { FormattedMessage } from '../../../../util/reactIntl';
 import { ensureCurrentUser } from '../../../../util/data';
+import { getCurrentUserTypeRoles } from '../../../../util/userHelpers';
 
 import {
   AvatarLarge,
@@ -83,7 +85,12 @@ const TopbarMobileMenu = props => {
     showCreateListingsLink,
   } = props;
 
+  const config = useConfiguration();
   const user = ensureCurrentUser(currentUser);
+
+  // Companies (the 'customer' role) are the ones posting jobs on this
+  // marketplace, so they get a direct link to the new job page.
+  const { customer: isCompany } = getCurrentUserTypeRoles(config, currentUser);
 
   const extraLinks = customLinks.map((linkConfig, index) => {
     return (
@@ -136,7 +143,7 @@ const TopbarMobileMenu = props => {
 
           <div className={css.spacer} />
         </div>
-        <div className={css.footer}>{createListingsLinkMaybe}</div>
+        {/* <div className={css.footer}>{createListingsLinkMaybe}</div> */}
       </nav>
     );
   }
@@ -153,6 +160,14 @@ const TopbarMobileMenu = props => {
     const isInboxPage = currentPage?.indexOf('InboxPage') === 0 && page?.indexOf('InboxPage') === 0;
     return currentPage === page || isAccountSettingsPage || isInboxPage ? css.currentPage : null;
   };
+
+  const createJobLinkMaybe = isCompany ? (
+    <li className={classNames(css.navigationLink, currentPageClass('NewListingPage'))}>
+      <NamedLink name="NewListingPage">
+        <FormattedMessage id="TopbarMobileMenu.createJobLink" />
+      </NamedLink>
+    </li>
+  ) : null;
 
   const manageListingsLinkMaybe = showCreateListingsLink ? (
     <li className={classNames(css.navigationLink, currentPageClass('ManageListingsPage'))}>
@@ -180,6 +195,7 @@ const TopbarMobileMenu = props => {
               {notificationCountBadge}
             </NamedLink>
           </li>
+          {createJobLinkMaybe}
           {manageListingsLinkMaybe}
           <li className={classNames(css.navigationLink, currentPageClass('ProfileSettingsPage'))}>
             <NamedLink name="ProfileSettingsPage">
@@ -195,7 +211,7 @@ const TopbarMobileMenu = props => {
         <ul className={css.customLinksWrapper}>{extraLinks}</ul>
         <div className={css.spacer} />
       </div>
-      <div className={css.footer}>{createListingsLinkMaybe}</div>
+      {/* <div className={css.footer}>{createListingsLinkMaybe}</div> */}
     </div>
   );
 };
