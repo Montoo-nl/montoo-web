@@ -151,3 +151,12 @@ export const createUserWithIdp = body => {
 export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
+
+// Ask the backend for presigned URLs that allow uploading files straight
+// from the browser to the marketplace's own file storage.
+//
+// See `server/api/presigned-url.js` to see what data should be sent in the
+// body ({ storagePath, files: [{ name, type }] }) and what is returned.
+export const getPresignedUploadUrls = body => {
+  return post('/api/presigned-url', body);
+};
