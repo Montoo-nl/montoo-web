@@ -23,6 +23,7 @@ const { authenticateFacebook, authenticateFacebookCallback } = require('./api/au
 const { authenticateGoogle, authenticateGoogleCallback } = require('./api/auth/google');
 const middleware = require('./middleware');
 const generatePresignedUrl = require('./api/presigned-url');
+const updateAggregateRating = require('./api/update-aggregate-rating');
 
 const router = express.Router();
 
@@ -86,5 +87,6 @@ router.get('/auth/google/callback', authenticateGoogleCallback);
 
 router.post('/presigned-url', middleware.auth, generatePresignedUrl);
 
+router.post('/update-aggregate-rating', middleware.auth, updateAggregateRating);
 
 module.exports = router;

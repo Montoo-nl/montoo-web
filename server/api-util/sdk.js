@@ -3,6 +3,7 @@ const https = require('https');
 const Decimal = require('decimal.js');
 const log = require('../log');
 const sharetribeSdk = require('sharetribe-flex-sdk');
+const sharetribeIntegrationSdk = require('sharetribe-flex-integration-sdk');
 
 const CLIENT_ID = process.env.REACT_APP_SHARETRIBE_SDK_CLIENT_ID;
 const CLIENT_SECRET = process.env.SHARETRIBE_SDK_CLIENT_SECRET;
@@ -13,6 +14,8 @@ const MAX_SOCKETS_DEFAULT = 10;
 
 const BASE_URL = process.env.REACT_APP_SHARETRIBE_SDK_BASE_URL;
 const ASSET_CDN_BASE_URL = process.env.REACT_APP_SHARETRIBE_SDK_ASSET_CDN_BASE_URL;
+
+const { SHARETRIBE_INTEGRATION_CLIENT_ID, SHARETRIBE_INTEGRATION_CLIENT_SECRET } = process.env;
 
 // Application type handlers for JS SDK.
 //
@@ -233,3 +236,16 @@ exports.fetchAccessControlAsset = sdk => {
       return response;
     });
 };
+
+exports.getIntegrationSdk = () =>
+  sharetribeIntegrationSdk.createInstance({
+    clientId: SHARETRIBE_INTEGRATION_CLIENT_ID,
+    clientSecret: SHARETRIBE_INTEGRATION_CLIENT_SECRET,
+    // Pass rate limit handlers
+    queryLimiter: sharetribeIntegrationSdk.util.createRateLimiter(
+      sharetribeIntegrationSdk.util.prodQueryLimiterConfig
+    ),
+    commandLimiter: sharetribeIntegrationSdk.util.createRateLimiter(
+      sharetribeIntegrationSdk.util.prodCommandLimiterConfig
+    ),
+  });

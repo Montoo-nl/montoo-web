@@ -160,3 +160,7 @@ export const deleteUserAccount = body => {
 export const getPresignedUploadUrls = body => {
   return post('/api/presigned-url', body);
 };
+
+export const updateRating = body => {
+  return post('/api/update-aggregate-rating', body);
+};

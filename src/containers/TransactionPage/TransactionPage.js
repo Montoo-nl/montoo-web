@@ -88,6 +88,7 @@ import {
   downloadFile,
 } from './TransactionPage.duck';
 import css from './TransactionPage.module.css';
+import { updateRating } from '../../util/api.js';
 
 const MAX_MOBILE_SCREEN_WIDTH = 1023;
 const SEND_MESSAGE_FORM_ID = 'TransactionPanel.SendMessageForm';
@@ -550,6 +551,10 @@ export const TransactionPageComponent = props => {
 
     onSendReview(transaction, transitionOptions, params, config)
       .then(r => {
+        if (transactionRole === CUSTOMER) {
+          updateRating({ transactionId: transaction.id.uuid, rating });
+        }
+        
         setReviewModalOpen(false);
         setReviewSubmitted(true);
       })
