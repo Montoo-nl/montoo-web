@@ -1,0 +1,80 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  margin: 0 0 16px 0;
+  padding: 16px;
+  border-radius: var(--borderRadiusMedium);
+  border: 1px solid var(--colorAttention);
+  background-color: var(--colorAttentionSubtle);
+  color: var(--colorAttentionDark);
+}
+
+.title {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+  padding: 0;
+}
+
+.info {
+  font-size: 14px;
+  line-height: 20px;
+  margin: 4px 0 0 0;
+  padding: 0;
+}
+
+.list {
+  font-size: 14px;
+  line-height: 20px;
+  list-style: disc;
+  margin: 8px 0 0 0;
+  padding: 0 0 0 20px;
+}
+
+.list > li {
+  margin: 0;
+  padding: 0;
+}
+
+.link {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--fontWeightSemiBold);
+  margin-top: 12px;
+  color: var(--colorAttentionDark);
+  text-decoration: underline;
+
+  &:hover {
+    color: var(--colorAttentionDark);
+  }
+}
+
+/* Compact variant for the fixed mobile CTA bar, where vertical space is tight */
+.inCTA {
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+}
+
+.inCTA .title {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.inCTA .info {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.inCTA .list {
+  font-size: 13px;
+  line-height: 18px;
+  margin-top: 4px;
+}
+
+.inCTA .link {
+  font-size: 13px;
+  line-height: 18px;
+  margin-top: 8px;
+}

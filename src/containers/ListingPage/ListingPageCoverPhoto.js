@@ -333,6 +333,7 @@ export const ListingPageComponent = props => {
               className={css.orderPanel}
               listing={currentListing}
               isOwnListing={isOwnListing}
+              currentUser={currentUser}
               onSubmit={handleOrderSubmit}
               authorLink={
                 <NamedLink

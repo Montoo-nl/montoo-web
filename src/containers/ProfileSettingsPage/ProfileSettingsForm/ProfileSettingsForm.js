@@ -15,6 +15,7 @@ import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
 import {
   certificateStoragePath,
   getCertificateTypeOptions,
+  getSpecialisationOptions,
   identityDocumentStoragePath,
   insuranceDocumentStoragePath,
 } from '../../../config/configTechnician';
@@ -299,12 +300,7 @@ const TechnicianDetailsMaybe = props => {
   // categories, and their certifications from the 'certifications' listing
   // field, so that both line up with the jobs companies post. Only the ids are
   // stored - the names are read from the config every time they are shown.
-  const specialisationOptions = (config.categoryConfiguration?.categories || [])
-    .filter(category => category?.id != null)
-    .map(category => ({
-      key: `${category.id}`,
-      label: category.name || `${category.id}`,
-    }));
+  const specialisationOptions = getSpecialisationOptions(config);
   const certificateOptions = getCertificateTypeOptions(config);
 
   const documentFileInfo = intl.formatMessage({ id: 'ProfileSettingsForm.documentFileInfo' });

@@ -81,22 +81,32 @@ const pickCompanyDetails = values =>
 const companyDetailInitialValues = protectedData =>
   COMPANY_DETAIL_KEYS.reduce((values, key) => ({ ...values, [key]: protectedData?.[key] }), {});
 
-// The permissions granted to the currentUser, as they are listed in the modal
-// below. They come from the currentUser's effectivePermissionSet relationship.
-const PERMISSION_ROWS = [
+// The permissions listed in the modal below, in the words of what the role
+// actually does on this marketplace. They come from the currentUser's
+// effectivePermissionSet relationship. Only the permissions that matter for the
+// role are listed - a technician never posts a job, a company never applies.
+const COMPANY_PERMISSION_ROWS = [
   {
     key: 'read',
-    labelId: 'ProfileSettingsPage.permissionRead',
+    labelId: 'ProfileSettingsPage.permissionBrowseTechnicians',
     hasPermission: hasPermissionToViewData,
   },
   {
     key: 'postListings',
-    labelId: 'ProfileSettingsPage.permissionPostListings',
+    labelId: 'ProfileSettingsPage.permissionCreateJobs',
     hasPermission: hasPermissionToPostListings,
+  },
+];
+
+const TECHNICIAN_PERMISSION_ROWS = [
+  {
+    key: 'read',
+    labelId: 'ProfileSettingsPage.permissionBrowseJobs',
+    hasPermission: hasPermissionToViewData,
   },
   {
     key: 'initiateTransactions',
-    labelId: 'ProfileSettingsPage.permissionInitiateTransactions',
+    labelId: 'ProfileSettingsPage.permissionApplyToJobs',
     hasPermission: hasPermissionToInitiateTransactions,
   },
 ];
@@ -121,9 +131,14 @@ const PendingApprovalModal = props => {
 
   const { email, emailVerified: isEmailVerified } = currentUser?.attributes || {};
 
-  const permissions = PERMISSION_ROWS.map(row => ({
+  const permissionRows = isCompany ? COMPANY_PERMISSION_ROWS : TECHNICIAN_PERMISSION_ROWS;
+  // Read permission gates everything else: applying to a job or creating one
+  // both start from finding it, so a row can't be available on its own while
+  // browsing is still blocked - even if the API grants that permission already.
+  const canViewData = hasPermissionToViewData(currentUser);
+  const permissions = permissionRows.map(row => ({
     ...row,
-    isAllowed: row.hasPermission(currentUser),
+    isAllowed: row.hasPermission(currentUser) && (row.key === 'read' || canViewData),
   }));
   // Approval doesn't necessarily restrict anything: if the marketplace grants
   // every permission up front, there is nothing to list.

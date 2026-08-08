@@ -17,6 +17,30 @@
 // technician can upload proof of.
 export const CERTIFICATIONS_LISTING_FIELD_KEY = 'certifications';
 
+// The listing's level 1 category, i.e. the trade the job belongs to. A
+// technician covers a trade by listing it among their specialisations.
+export const CATEGORY_LEVEL_1_KEY = 'categoryLevel1';
+
+/**
+ * The specialisations a technician can pick, i.e. the top level (level 1)
+ * categories from the hosted configuration. Saved as an array of category ids
+ * to the user's publicData.specialisations.
+ *
+ * Note: only the category id is treated as stable. Names can be edited in
+ * Console at any time, so they are only read for display, and the id is used as
+ * the label if a category has no name.
+ *
+ * @param {Object} config marketplace configuration
+ * @returns {Array<Object>} [{ key, label }] - empty if no categories are set up
+ */
+export const getSpecialisationOptions = config =>
+  (config?.categoryConfiguration?.categories || [])
+    .filter(category => category?.id != null)
+    .map(category => ({
+      key: `${category.id}`,
+      label: category.name || `${category.id}`,
+    }));
+
 /**
  * The certifications a technician can upload proof of, taken from the
  * 'certifications' listing field in the hosted configuration. Each option gets
@@ -45,6 +69,71 @@ export const getCertificateTypeOptions = config => {
       key: `${o.option}`,
       label: o.label || `${o.option}`,
     }));
+};
+
+/**
+ * The certifications a job requires that the technician hasn't uploaded.
+ *
+ * The job lists what it requires in publicData.certifications (an array of
+ * option values), and the technician's uploads are keyed by the same option
+ * values in protectedData.certificates - so the two line up directly.
+ *
+ * @param {Object} listingPublicData publicData of the job listing
+ * @param {Object} currentUser API entity, or null when nobody is logged in
+ * @returns {Array<string>} the option values that are missing, empty if none
+ */
+export const getMissingCertifications = (listingPublicData, currentUser) => {
+  const required = listingPublicData?.[CERTIFICATIONS_LISTING_FIELD_KEY];
+  const certificates = currentUser?.attributes?.profile?.protectedData?.certificates || {};
+
+  return Array.isArray(required) ? required.filter(option => !certificates[option]?.url) : [];
+};
+
+/**
+ * The job's trade, if the technician doesn't have it among their
+ * specialisations. Both sides use category ids, so they compare directly.
+ *
+ * @param {Object} listingPublicData publicData of the job listing
+ * @param {Object} currentUser API entity, or null when nobody is logged in
+ * @returns {Array<string>} the category id that is missing, empty if none
+ */
+export const getMissingSpecialisations = (listingPublicData, currentUser) => {
+  const required = listingPublicData?.[CATEGORY_LEVEL_1_KEY];
+  const specialisations = currentUser?.attributes?.profile?.publicData?.specialisations || [];
+
+  return required && !specialisations.includes(required) ? [required] : [];
+};
+
+/**
+ * Everything a job asks for that the technician's profile doesn't cover yet,
+ * as labels ready to be shown.
+ *
+ * Returns nothing for a logged out visitor: they are sent to the login page on
+ * submit, and only then can their profile be compared against the job.
+ *
+ * @param {Object} listingPublicData publicData of the job listing
+ * @param {Object} currentUser API entity, or null when nobody is logged in
+ * @param {Object} config marketplace configuration
+ * @returns {Object} { specialisations: Array<string>, certifications: Array<string> }
+ */
+export const getMissingJobRequirements = (listingPublicData, currentUser, config) => {
+  if (!currentUser?.id) {
+    return { specialisations: [], certifications: [] };
+  }
+
+  const toLabels = (values, options) =>
+    values.map(value => options.find(o => o.key === value)?.label || value);
+
+  return {
+    specialisations: toLabels(
+      getMissingSpecialisations(listingPublicData, currentUser),
+      getSpecialisationOptions(config)
+    ),
+    certifications: toLabels(
+      getMissingCertifications(listingPublicData, currentUser),
+      getCertificateTypeOptions(config)
+    ),
+  };
 };
 
 /**

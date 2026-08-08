@@ -309,6 +309,7 @@ export const ListingPageComponent = props => {
               })}
               listing={currentListing}
               isOwnListing={isOwnListing}
+              currentUser={currentUser}
               onSubmit={handleOrderSubmit}
               authorLink={
                 <NamedLink

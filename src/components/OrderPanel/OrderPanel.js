@@ -37,7 +37,11 @@ import {
   resolveLatestProcessName,
 } from '../../transactions/transaction';
 
+import { useConfiguration } from '../../context/configurationContext';
+import { getMissingJobRequirements } from '../../config/configTechnician';
+
 import { ModalInMobile, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
+import MissingJobRequirements from './MissingJobRequirements/MissingJobRequirements';
 import PriceVariantPicker from './PriceVariantPicker/PriceVariantPicker';
 import SubmitFinePrint from './SubmitFinePrint/SubmitFinePrint';
 
@@ -258,6 +262,8 @@ const hasValidPriceVariants = priceVariants => {
  * @param {propTypes.listing} props.listing - The listing data (either regular or own listing)
  * @param {Array<ListingTypeConfig>} props.validListingTypes - Array of valid listing type configurations
  * @param {boolean} [props.isOwnListing=false] - Whether the listing belongs to the current user
+ * @param {Object} [props.currentUser] - The current user. Used to check whether they hold the
+ * certifications the job requires.
  * @param {listingType.user|listingType.currentUser} props.author - The listing author's user data
  * @param {ReactNode} [props.authorLink] - Custom component for rendering the author link
  * @param {ReactNode} [props.payoutDetailsWarning] - Warning message about payout details
@@ -282,6 +288,7 @@ const hasValidPriceVariants = priceVariants => {
 const OrderPanel = props => {
   const [mounted, setMounted] = useState(false);
   const intl = useIntl();
+  const config = useConfiguration();
   const location = useLocation();
   const history = useHistory();
 
@@ -296,6 +303,7 @@ const OrderPanel = props => {
     validListingTypes,
     lineItemUnitType: lineItemUnitTypeMaybe,
     isOwnListing,
+    currentUser,
     onSubmit,
     title,
     titleDesktop,
@@ -369,6 +377,16 @@ const OrderPanel = props => {
   const showNegotiationForm = mounted && !isClosed && isNegotiation && unitType === REQUEST;
   // if listing is an offer, we show the "request a quote" form as user needs to ask for a quote first from the provider.
   const showRequestQuoteForm = mounted && !isClosed && isNegotiation && unitType === OFFER;
+
+  // A technician can only make an offer once their profile covers what the job
+  // asks for. Computed here rather than inside NegotiationForm, because the
+  // mobile CTA below submits directly and has to be blocked the same way.
+  const missingJobRequirements = showNegotiationForm
+    ? getMissingJobRequirements(publicData, currentUser, config)
+    : null;
+  const hasMissingJobRequirements =
+    missingJobRequirements?.specialisations?.length > 0 ||
+    missingJobRequirements?.certifications?.length > 0;
 
   const supportedProcessesInfo = getSupportedProcessesInfo();
   const isKnownProcess = supportedProcessesInfo.map(info => info.name).includes(processName);
@@ -569,6 +587,7 @@ const OrderPanel = props => {
             finePrintComponent={SubmitFinePrint}
             payoutDetailsWarning={payoutDetailsWarning}
             isOwnListing={isOwnListing}
+            missingRequirements={missingJobRequirements}
           />
         ) : showRequestQuoteForm ? (
           <NegotiationRequestQuoteForm
@@ -585,49 +604,56 @@ const OrderPanel = props => {
         ) : null}
       </ModalInMobile>
       <div className={css.openOrderForm}>
-        <PriceMaybe
-          price={price}
-          publicData={publicData}
-          validListingTypes={validListingTypes}
-          intl={intl}
-          marketplaceCurrency={marketplaceCurrency}
-          showCurrencyMismatch
+        <MissingJobRequirements
+          className={css.missingJobRequirementsInCTA}
+          missingRequirements={missingJobRequirements}
         />
 
-        {isClosed ? (
-          <div className={css.closedListingButton}>
-            <FormattedMessage id="OrderPanel.closedListingButtonText" />
-          </div>
-        ) : (
-          <PrimaryButton
-            id={ORDER_PANEL_SUBMIT_BUTTON_ID}
-            onClick={handleSubmit(
-              isOwnListing,
-              isClosed,
-              showInquiryForm || showNegotiationForm,
-              onSubmit,
-              history,
-              location
-            )}
-            disabled={isOutOfStock}
-          >
-            {isBooking ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageBooking" />
-            ) : isOutOfStock ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageNoStock" />
-            ) : isPurchase ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessagePurchase" />
-            ) : showNegotiationForm ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageMakeOffer" />
-            ) : showRequestQuoteForm ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageRequestAQuote" />
-            ) : showDownloadForm ? (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageDownload" />
-            ) : (
-              <FormattedMessage id="OrderPanel.ctaButtonMessageInquiry" />
-            )}
-          </PrimaryButton>
-        )}
+        <div className={css.openOrderFormRow}>
+          <PriceMaybe
+            price={price}
+            publicData={publicData}
+            validListingTypes={validListingTypes}
+            intl={intl}
+            marketplaceCurrency={marketplaceCurrency}
+            showCurrencyMismatch
+          />
+
+          {isClosed ? (
+            <div className={css.closedListingButton}>
+              <FormattedMessage id="OrderPanel.closedListingButtonText" />
+            </div>
+          ) : (
+            <PrimaryButton
+              id={ORDER_PANEL_SUBMIT_BUTTON_ID}
+              onClick={handleSubmit(
+                isOwnListing,
+                isClosed,
+                showInquiryForm || showNegotiationForm,
+                onSubmit,
+                history,
+                location
+              )}
+              disabled={isOutOfStock || hasMissingJobRequirements}
+            >
+              {isBooking ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageBooking" />
+              ) : isOutOfStock ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageNoStock" />
+              ) : isPurchase ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessagePurchase" />
+              ) : showNegotiationForm ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageMakeOffer" />
+              ) : showRequestQuoteForm ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageRequestAQuote" />
+              ) : showDownloadForm ? (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageDownload" />
+              ) : (
+                <FormattedMessage id="OrderPanel.ctaButtonMessageInquiry" />
+              )}
+            </PrimaryButton>
+          )}
+        </div>
       </div>
     </div>
   );

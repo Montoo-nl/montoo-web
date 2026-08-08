@@ -554,7 +554,7 @@ export const TransactionPageComponent = props => {
         if (transactionRole === CUSTOMER) {
           updateRating({ transactionId: transaction.id.uuid, rating });
         }
-        
+
         setReviewModalOpen(false);
         setReviewSubmitted(true);
       })
@@ -974,6 +974,7 @@ export const TransactionPageComponent = props => {
           titleClassName={css.orderTitle}
           listing={listing}
           isOwnListing={isOwnSale}
+          currentUser={currentUser}
           lineItemUnitType={lineItemUnitType}
           title={listingTitle}
           titleDesktop={

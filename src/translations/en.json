@@ -1555,9 +1555,10 @@
   "ProfileSettingsPage.pendingApprovalMessageTechnician": "Thanks for sending in your details. An admin is checking them, which usually takes one to two working days. Once your profile is approved, you can start applying to jobs.",
   "ProfileSettingsPage.pendingApprovalEmailNote": "We will send the decision to {email}.",
   "ProfileSettingsPage.pendingApprovalEmailUnverified": "Your email address {email} is not verified yet. We send the approval notice by email, so verify your address — otherwise you will not receive it.",
-  "ProfileSettingsPage.permissionRead": "Browse listings and profiles",
-  "ProfileSettingsPage.permissionPostListings": "Post listings",
-  "ProfileSettingsPage.permissionInitiateTransactions": "Start bookings and orders",
+  "ProfileSettingsPage.permissionBrowseJobs": "Browse jobs",
+  "ProfileSettingsPage.permissionApplyToJobs": "Apply to jobs",
+  "ProfileSettingsPage.permissionBrowseTechnicians": "Browse technicians",
+  "ProfileSettingsPage.permissionCreateJobs": "Create jobs",
   "ProfileSettingsPage.permissionAllowed": "Available",
   "ProfileSettingsPage.permissionPending": "After approval",
   "ProfileSettingsForm.companyDetailsHeading": "Your company details",
@@ -1585,5 +1586,10 @@
   "TopbarMobileMenu.createJobLink": "Create a job",
   "EditListingDetailsForm.compensationLabel": "Compensation",
   "EditListingDetailsForm.compensationPlaceholder": "What are you paying for this job?",
-  "EditListingDetailsForm.compensationRequired": "Compensation is required."
+  "EditListingDetailsForm.compensationRequired": "Compensation is required.",
+  "MissingJobRequirements.title": "You can't apply to this job yet",
+  "MissingJobRequirements.info": "Your profile is missing what this job asks for:",
+  "MissingJobRequirements.specialisation": "Specialisation: {label}",
+  "MissingJobRequirements.certification": "Certification: {label}",
+  "MissingJobRequirements.updateProfileLink": "Update your profile"
 }
