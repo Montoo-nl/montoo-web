@@ -6,6 +6,7 @@ import classNames from 'classnames';
 // Utils
 import { FormattedMessage } from '../../util/reactIntl';
 import { LISTING_STATE_CLOSED, propTypes } from '../../util/types';
+import { getCurrentUserTypeRoles } from '../../util/userHelpers';
 import { OFFER, REQUEST } from '../../transactions/transaction';
 
 // Global ducks (for Redux actions and thunks)
@@ -165,6 +166,7 @@ export const ListingPageComponent = props => {
   }
   const unitType = publicData.unitType;
   const isNegotiation = processType === 'negotiation';
+  const { provider: isTechnician } = getCurrentUserTypeRoles(config, currentUser);
 
   const commonParams = { params, history, routes: routeConfiguration };
   const onContactUser = handleContactUser({
@@ -189,6 +191,13 @@ export const ListingPageComponent = props => {
     if (isOwnListing || isCurrentlyClosed) {
       window.scrollTo(0, 0);
     } else if (isNegotiation && unitType === REQUEST) {
+      // Only technicians apply to jobs. A logged out visitor is let through -
+      // MakeOfferPage requires auth, so they land on the login page and their
+      // user type is only known after that.
+      if (isAuthenticated && !isTechnician) {
+        window.alert(intl.formatMessage({ id: 'ListingPage.onlyTechniciansCanApply' }));
+        return;
+      }
       // This is to navigate to MakeOfferPage when NegotiationForm is submitted
       const onNavigateToMakeOfferPage = handleNavigateToMakeOfferPage({
         ...commonParams,

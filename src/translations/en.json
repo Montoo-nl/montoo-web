@@ -1597,5 +1597,6 @@
   "MakeOfferPage.policiesAcceptRequired": "You have to accept the platform policies to submit a proposal.",
   "ContentFilter.errorContactDetails": "{count, plural, one {Please change your message: {terms} is not allowed.} other {Please change your message: {terms} are not allowed.}} Keep contact details on the platform until the job is agreed.",
   "ContentFilter.errorPaymentMethod": "{count, plural, one {Please change your message: {terms} is not allowed.} other {Please change your message: {terms} are not allowed.}} Payments have to go through the platform.",
-  "ContentFilter.errorBoth": "Please change your message: {terms} are not allowed. Contact details and payments stay on the platform."
+  "ContentFilter.errorBoth": "Please change your message: {terms} are not allowed. Contact details and payments stay on the platform.",
+  "ListingPage.onlyTechniciansCanApply": "Only technicians can apply to jobs. Your account is registered as a company."
 }

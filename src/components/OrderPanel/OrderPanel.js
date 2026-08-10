@@ -38,6 +38,7 @@ import {
 } from '../../transactions/transaction';
 
 import { useConfiguration } from '../../context/configurationContext';
+import { getCurrentUserTypeRoles } from '../../util/userHelpers';
 import { getMissingJobRequirements } from '../../config/configTechnician';
 
 import { ModalInMobile, PrimaryButton, AvatarSmall, H1, H2 } from '../../components';
@@ -379,11 +380,17 @@ const OrderPanel = props => {
   const showRequestQuoteForm = mounted && !isClosed && isNegotiation && unitType === OFFER;
 
   // A technician can only make an offer once their profile covers what the job
-  // asks for. Computed here rather than inside NegotiationForm, because the
-  // mobile CTA below submits directly and has to be blocked the same way.
-  const missingJobRequirements = showNegotiationForm
-    ? getMissingJobRequirements(publicData, currentUser, config)
-    : null;
+  // asks for. Companies don't have specialisations or certifications of their
+  // own, so the check is limited to the 'provider' role - otherwise a company
+  // looking at the job it posted would be told its own profile falls short.
+  //
+  // Computed here rather than inside NegotiationForm, because the mobile CTA
+  // below submits directly and has to be blocked the same way.
+  const { provider: isTechnician } = getCurrentUserTypeRoles(config, currentUser);
+  const missingJobRequirements =
+    showNegotiationForm && isTechnician
+      ? getMissingJobRequirements(publicData, currentUser, config)
+      : null;
   const hasMissingJobRequirements =
     missingJobRequirements?.specialisations?.length > 0 ||
     missingJobRequirements?.certifications?.length > 0;
