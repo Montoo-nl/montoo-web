@@ -7,10 +7,12 @@ import classNames from 'classnames';
 import { FormattedMessage, intlShape } from '../../../util/reactIntl.js';
 import { propTypes } from '../../../util/types.js';
 import { getPropsForCustomTransactionFieldInputs } from '../../../util/fieldHelpers.js';
+import { requiredFieldArrayCheckbox } from '../../../util/validators.js';
 
 // Import shared components
 import {
   CustomExtendedDataField,
+  FieldCheckboxGroup,
   FieldTextInput,
   Form,
   NamedLink,
@@ -18,6 +20,14 @@ import {
 } from '../../../components/index.js';
 
 import css from './MakeOfferForm.module.css';
+
+// Note: NamedLink doesn't forward a target attribute, so this navigates in the
+// same tab.
+const policiesLink = (
+  <NamedLink name="TermsOfServicePage">
+    <FormattedMessage id="MakeOfferPage.policiesLinkText" />
+  </NamedLink>
+);
 
 const FinePrint = ({ stripeConnected }) => {
   if (stripeConnected) {
@@ -138,6 +148,25 @@ export const MakeOfferForm = props => {
                     id: 'MakeOfferPage.defaultMessagePlaceholder',
                   },
                   { authorDisplayName }
+                )}
+              />
+
+              <FieldCheckboxGroup
+                className={css.policies}
+                name="policies"
+                id={formId ? `${formId}.policies-accepted` : 'policies-accepted'}
+                optionLabelClassName={css.policiesLabel}
+                options={[
+                  {
+                    key: 'platform-policies',
+                    label: intl.formatMessage(
+                      { id: 'MakeOfferPage.policiesAcceptText' },
+                      { policiesLink }
+                    ),
+                  },
+                ]}
+                validate={requiredFieldArrayCheckbox(
+                  intl.formatMessage({ id: 'MakeOfferPage.policiesAcceptRequired' })
                 )}
               />
             </div>

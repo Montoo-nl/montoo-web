@@ -40,6 +40,20 @@
   text-align: center;
 }
 
+/* "I accept the platform policies" checkbox */
+.policies {
+  margin-top: 24px;
+
+  @media (--viewportMedium) {
+    margin-top: 32px;
+  }
+}
+
+.policiesLabel {
+  font-size: 14px;
+  line-height: 20px;
+}
+
 .transactionFieldsContainer {
   margin-top: 36px;
   margin-bottom: 36px;

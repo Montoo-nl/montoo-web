@@ -1591,5 +1591,8 @@
   "MissingJobRequirements.info": "Your profile is missing what this job asks for:",
   "MissingJobRequirements.specialisation": "Specialisation: {label}",
   "MissingJobRequirements.certification": "Certification: {label}",
-  "MissingJobRequirements.updateProfileLink": "Update your profile"
+  "MissingJobRequirements.updateProfileLink": "Update your profile",
+  "MakeOfferPage.policiesAcceptText": "I accept the {policiesLink}.",
+  "MakeOfferPage.policiesLinkText": "platform policies",
+  "MakeOfferPage.policiesAcceptRequired": "You have to accept the platform policies to submit a proposal."
 }
