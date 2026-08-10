@@ -10,6 +10,7 @@ import { useConfiguration } from '../../context/configurationContext.js';
 import { useRouteConfiguration } from '../../context/routeConfigurationContext.js';
 import { userDisplayNameAsString } from '../../util/data.js';
 import { moneyFromExtendedData } from '../../util/currency.js';
+import { findDisallowedContent, getDisallowedContentMessage } from '../../util/contentFilter.js';
 import { LISTING_UNIT_TYPES } from '../../util/types.js';
 import { isErrorNoPermissionForInitiateTransactions } from '../../util/errors.js';
 import {
@@ -76,7 +77,6 @@ const handleSubmit = (submitting, setSubmitting, props, transactionFieldConfigs)
   if (submitting) {
     return;
   }
-  setSubmitting(true);
 
   const {
     history,
@@ -85,6 +85,7 @@ const handleSubmit = (submitting, setSubmitting, props, transactionFieldConfigs)
     location,
     listing,
     currentUser,
+    intl,
     onMakeOffer,
     onSubmitCallback,
   } = props;
@@ -93,6 +94,21 @@ const handleSubmit = (submitting, setSubmitting, props, transactionFieldConfigs)
   const transactionId = searchParams.transactionId;
 
   const { providerDefaultMessage, quote } = values;
+
+  setSubmitting(true);
+  // Contact details and payment methods stay on the platform. Checked here, on
+  // submit, rather than as a field-level validator - the filter runs a set of
+  // regexes over the message, which is wasted work on every keystroke.
+  // TODO: replace the alert with an inline error next to the message field.
+  const disallowedContentMessage = getDisallowedContentMessage(
+    intl,
+    findDisallowedContent(providerDefaultMessage)
+  );
+  if (disallowedContentMessage) {
+    window.alert(disallowedContentMessage);
+    setSubmitting(false);
+    return;
+  }
 
   const { listingType, transactionProcessAlias, unitType } = listing?.attributes?.publicData || {};
 
@@ -266,6 +282,7 @@ const MakeOfferPageComponent = props => {
               makeOfferError={makeOfferError}
               transactionFieldConfigs={transactionFieldConfigs}
               transactionFieldInitialValues={transactionFieldInitialValues}
+              inProgress={submitting}
             />
           </section>
         </main>

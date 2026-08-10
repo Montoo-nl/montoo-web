@@ -95,6 +95,7 @@ export const MakeOfferForm = props => {
       initialValues={initialValuesMaybe}
       mutators={{ ...arrayMutators }}
       onSubmit={onSubmit}
+      keepDirtyOnReinitialize={true}
       {...restProps}
       render={formRenderProps => {
         const {

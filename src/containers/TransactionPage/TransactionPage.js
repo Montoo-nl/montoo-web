@@ -17,6 +17,7 @@ import {
 import { timestampToDate } from '../../util/dates';
 import { createSlug } from '../../util/urlHelpers';
 import { requireListingImage } from '../../util/configHelpers';
+import { findDisallowedContent, getDisallowedContentMessage } from '../../util/contentFilter';
 import { getCurrentUserTypeRoles, hasPermissionToViewData } from '../../util/userHelpers.js';
 import { userDisplayNameAsString } from '../../util/data';
 import { isMobileSafari } from '../../util/userAgent';
@@ -668,6 +669,20 @@ export const TransactionPageComponent = props => {
     if (!message) {
       return;
     }
+
+    // Contact details and payment methods stay on the platform. Checked here,
+    // on submit, rather than as a field-level validator - the filter runs a set
+    // of regexes over the message, which is wasted work on every keystroke.
+    // TODO: replace the alert with an inline error next to the message field.
+    const disallowedContentMessage = getDisallowedContentMessage(
+      intl,
+      findDisallowedContent(message)
+    );
+    if (disallowedContentMessage) {
+      window.alert(disallowedContentMessage);
+      return;
+    }
+
     // By default, the SendMessageForm submit button is disabled if
     // any files are still uploading or have an error. If you make changes to that
     // logic, adjust this logic to filter out pending or failed uploads.
