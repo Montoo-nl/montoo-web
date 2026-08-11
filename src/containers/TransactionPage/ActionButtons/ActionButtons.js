@@ -1,13 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import classNames from 'classnames';
 
-import { useIntl } from '../../../util/reactIntl';
+import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { getStartOf } from '../../../util/dates';
 import { allowCustomerCounterOffer, allowProviderUpdateOffer } from '../../../util/configHelpers';
+import { formatMoney } from '../../../util/currency';
+import { types as sdkTypes } from '../../../util/sdkLoader';
+import {
+  isPaid as isExtraPaymentPaid,
+  isPayable as isExtraPaymentPayable,
+  transitions as extraPaymentTransitions,
+} from '../../../transactions/transactionProcessExtraPayment';
 
 import { PrimaryButton, SecondaryButton, Button } from '../../../components';
 
+import RequestExtraPaymentModal from '../RequestExtraPaymentModal/RequestExtraPaymentModal';
+import ExtraPaymentModal from '../ExtraPaymentModal/ExtraPaymentModal';
 import css from './ActionButtons.module.css';
+
+const { Money } = sdkTypes;
 
 export const ACTION_BUTTON_1_ID = 'actionButton1';
 export const ACTION_BUTTON_2_ID = 'actionButton2';
@@ -161,9 +172,64 @@ const ActionButtons = props => {
     errorMessageId,
     timeZone = 'Etc/UTC',
     isCounterpartyInactive,
+    // Extra payments: everything the two sides do about an amount asked for
+    // after the job was paid for lives here, next to the process's own actions.
+    extraPaymentTxs = [],
+    onRequestExtraPayment,
+    onExtraPaymentUpdated,
+    onManageDisableScrolling,
+    currentUser,
+    currencyConfig,
   } = props;
 
   const intl = useIntl();
+
+  const [isRequestModalOpen, setRequestModalOpen] = useState(false);
+  const [requestInProgress, setRequestInProgress] = useState(false);
+  const [requestError, setRequestError] = useState(null);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [reviewedExtraPayment, setReviewedExtraPayment] = useState(null);
+
+  // A job only takes one extra payment for now, so the whole thing is driven by
+  // that single child transaction: its last transition says whether it is still
+  // waiting, was paid, or was turned down.
+  const extraPayment = extraPaymentTxs[0] || null;
+  const extraPaymentLastTransition = extraPayment?.attributes?.lastTransition;
+  const extraPaymentAmount = extraPayment?.attributes?.payinTotal;
+  const formattedExtraPayment = extraPaymentAmount ? formatMoney(intl, extraPaymentAmount) : '';
+
+  const isExtraPaymentOpen = isExtraPaymentPayable(extraPaymentLastTransition);
+  const wasExtraPaymentPaid = isExtraPaymentPaid(extraPaymentLastTransition);
+
+  // Asking for more only makes sense once the job itself has been paid for -
+  // before that, the amount is still being negotiated.
+  const isJobPaidFor = transitions.some(
+    t => t.transition === extraPaymentTransitions.CONFIRM_PAYMENT
+  );
+  const canRequestExtraPayment = isProvider && isJobPaidFor && !extraPayment;
+
+  const handleOpenRequestModal = () => {
+    setRequestError(null);
+    setRequestSubmitted(false);
+    setRequestModalOpen(true);
+  };
+
+  const handleSubmitRequest = values => {
+    setRequestInProgress(true);
+    setRequestError(null);
+
+    return onRequestExtraPayment(values)
+      .then(() => {
+        setRequestSubmitted(true);
+        setRequestModalOpen(false);
+      })
+      .catch(e => {
+        setRequestError(e);
+      })
+      .finally(() => {
+        setRequestInProgress(false);
+      });
+  };
 
   if (isListingDeleted && isProvider) {
     return null;
@@ -204,7 +270,138 @@ const ActionButtons = props => {
 
   const classes = classNames(rootClassName || css.root, className);
 
-  return showButtons ? (
+  // Neither asking for an extra payment nor answering one is a transition of
+  // the job's own process - the job is already paid for and usually has no
+  // action buttons left at all - so these sit outside the showButtons gate.
+  // The technician sees what actually reaches them: the transaction's own
+  // payout total, rather than the percentage worked out again on this side.
+  const extraPaymentPayout = extraPayment?.attributes?.payoutTotal;
+  const providerBreakdown =
+    isProvider && extraPaymentAmount && extraPaymentPayout ? (
+      <div className={css.extraPaymentBreakdown}>
+        <div className={css.extraPaymentRow}>
+          <span>
+            <FormattedMessage id="ActionButtons.extraPaymentAmountLabel" />
+          </span>
+          <span>{formattedExtraPayment}</span>
+        </div>
+        <div className={css.extraPaymentRow}>
+          <span>
+            <FormattedMessage id="ActionButtons.extraPaymentFeeLabel" />
+          </span>
+          <span>
+            -
+            {formatMoney(
+              intl,
+              new Money(
+                extraPaymentAmount.amount - extraPaymentPayout.amount,
+                extraPaymentAmount.currency
+              )
+            )}
+          </span>
+        </div>
+        <div className={classNames(css.extraPaymentRow, css.extraPaymentTotal)}>
+          <span>
+            <FormattedMessage id="ActionButtons.extraPaymentPayoutLabel" />
+          </span>
+          <span>{formatMoney(intl, extraPaymentPayout)}</span>
+        </div>
+      </div>
+    ) : null;
+
+  const extraPaymentStatus = !extraPayment ? null : isExtraPaymentOpen ? (
+    // The company answers it; the technician just waits
+    isProvider ? (
+      <>
+        <p className={css.extraPaymentStatus}>
+          <FormattedMessage
+            id="ActionButtons.extraPaymentPending"
+            values={{ amount: formattedExtraPayment }}
+          />
+        </p>
+        {providerBreakdown}
+      </>
+    ) : (
+      <SecondaryButton onClick={() => setReviewedExtraPayment(extraPayment)}>
+        <FormattedMessage
+          id="ActionButtons.reviewExtraPayment"
+          values={{ amount: formattedExtraPayment }}
+        />
+      </SecondaryButton>
+    )
+  ) : wasExtraPaymentPaid ? (
+    <>
+      <p className={css.extraPaymentStatus}>
+        <FormattedMessage
+          id={
+            isProvider ? 'ActionButtons.extraPaymentPaidProvider' : 'ActionButtons.extraPaymentPaid'
+          }
+          values={{ amount: formattedExtraPayment }}
+        />
+      </p>
+      {providerBreakdown}
+    </>
+  ) : (
+    <p className={css.extraPaymentStatus}>
+      <FormattedMessage id="ActionButtons.extraPaymentClosed" />
+    </p>
+  );
+
+  const extraPaymentActions =
+    canRequestExtraPayment || extraPaymentStatus ? (
+      <div className={css.extraPayments} key="extraPayments">
+        {canRequestExtraPayment ? (
+          <SecondaryButton onClick={handleOpenRequestModal}>
+            {intl.formatMessage({ id: 'ActionButtons.requestExtraPayment' })}
+          </SecondaryButton>
+        ) : null}
+
+        {extraPaymentStatus}
+      </div>
+    ) : null;
+
+  const extraPaymentModals = (
+    <>
+      <RequestExtraPaymentModal
+        id="RequestExtraPaymentModal"
+        isOpen={isRequestModalOpen}
+        onCloseModal={() => setRequestModalOpen(false)}
+        onManageDisableScrolling={onManageDisableScrolling}
+        onSubmit={handleSubmitRequest}
+        requestSubmitted={requestSubmitted}
+        requestInProgress={requestInProgress}
+        requestError={requestError}
+        currencyConfig={currencyConfig}
+      />
+
+      <ExtraPaymentModal
+        id="ExtraPaymentModal"
+        isOpen={!!reviewedExtraPayment}
+        onCloseModal={() => setReviewedExtraPayment(null)}
+        onManageDisableScrolling={onManageDisableScrolling}
+        extraPaymentTx={reviewedExtraPayment}
+        currentUser={currentUser}
+        onPaid={() => {
+          setReviewedExtraPayment(null);
+          // The list of requests is a snapshot taken when the page loaded, so
+          // paying or declining one has to reload it - otherwise the button
+          // stays as it was.
+          onExtraPaymentUpdated?.();
+        }}
+      />
+    </>
+  );
+
+  if (!showButtons) {
+    return extraPaymentActions ? (
+      <div className={classes}>
+        {extraPaymentActions}
+        {extraPaymentModals}
+      </div>
+    ) : null;
+  }
+
+  return (
     <div className={classes}>
       <div className={css.actionErrors}>
         {primaryErrorMessage || secondaryErrorMessage || tertiaryErrorMessage}
@@ -272,8 +469,11 @@ const ActionButtons = props => {
           </div>
         ) : null}
       </div>
+
+      {extraPaymentActions}
+      {extraPaymentModals}
     </div>
-  ) : null;
+  );
 };
 
 export default ActionButtons;

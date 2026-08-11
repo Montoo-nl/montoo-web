@@ -123,6 +123,9 @@ export class TransactionPanelComponent extends Component {
       fileAttachments,
       activityFeed,
       actionButtons,
+      // Extra payments live outside the process's own action buttons, so they
+      // have to get rendered even when the job itself has no actions left.
+      showExtraPaymentActions,
       isInquiryProcess,
       orderBreakdown,
       orderPanel,
@@ -291,7 +294,7 @@ export class TransactionPanelComponent extends Component {
               </div>
             )}
 
-            {stateData.showActionButtons ? (
+            {stateData.showActionButtons || showExtraPaymentActions ? (
               <>
                 <div className={css.mobileActionButtonSpacer}></div>
                 <div className={css.mobileActionButtons}>{actionButtons('mobile')}</div>
@@ -343,7 +346,7 @@ export class TransactionPanelComponent extends Component {
                   />
                 ) : null}
 
-                {stateData.showActionButtons ? (
+                {stateData.showActionButtons || showExtraPaymentActions ? (
                   <div className={css.desktopActionButtons}>{actionButtons('desktop')}</div>
                 ) : null}
               </div>

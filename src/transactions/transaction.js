@@ -4,6 +4,7 @@ import * as bookingProcess from './transactionProcessBooking';
 import * as inquiryProcess from './transactionProcessInquiry';
 import * as negotiationProcess from './transactionProcessNegotiation';
 import * as downloadProcess from './transactionProcessDownload';
+import * as extraPaymentProcess from './transactionProcessExtraPayment';
 
 // Supported unit types
 // Note: These are passed to translations/microcopy in certain cases.
@@ -26,6 +27,10 @@ export const BOOKING_PROCESS_NAME = 'default-booking';
 export const INQUIRY_PROCESS_NAME = 'default-inquiry';
 export const NEGOTIATION_PROCESS_NAME = 'default-negotiation';
 export const DOWNLOAD_PROCESS_NAME = 'default-download';
+// Extra payments a technician asks for on a job that is already paid for.
+// Each request is its own transaction, linked to the job through
+// protectedData.parentTxId.
+export const EXTRA_PAYMENT_PROCESS_NAME = 'extra-payment';
 
 /**
  * A process should export:
@@ -70,6 +75,14 @@ const PROCESSES = [
     alias: `${DOWNLOAD_PROCESS_NAME}/release-1`,
     process: downloadProcess,
     unitTypes: [FILE],
+  },
+  {
+    name: EXTRA_PAYMENT_PROCESS_NAME,
+    alias: `${EXTRA_PAYMENT_PROCESS_NAME}/release-1`,
+    process: extraPaymentProcess,
+    // Runs on the same listing as the job it belongs to, so it reuses that
+    // listing's unit types rather than introducing one of its own.
+    unitTypes: [OFFER, REQUEST],
   },
 ];
 
@@ -370,6 +383,17 @@ export const isNegotiationProcessAlias = processAlias => {
   const processName = processAlias ? processAlias.split('/')[0] : null;
   return processAlias ? isNegotiationProcess(processName) : false;
 };
+/**
+ * Check if the process is the extra payment process
+ *
+ * @param {String} processName
+ */
+export const isExtraPaymentProcess = processName => {
+  const latestProcessName = resolveLatestProcessName(processName);
+  const processInfo = PROCESSES.find(process => process.name === latestProcessName);
+  return [EXTRA_PAYMENT_PROCESS_NAME].includes(processInfo?.name);
+};
+
 /**
  * Check if the process is download process
  *

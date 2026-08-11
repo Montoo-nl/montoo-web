@@ -37,6 +37,66 @@ exports.pendingOfferTransitions = makeOfferTransitions;
 // gone to someone else.
 exports.OPERATOR_REJECT_OFFER = 'transition/operator-reject-offer';
 
+// extra-payment process: the technician names an amount for work that wasn't in
+// the original job. Like a make-offer transition, the amount comes from the
+// request rather than from the listing, so line items have to be set from it.
+const REQUEST_EXTRA_PAYMENT = 'transition/request-extra-payment';
+exports.REQUEST_EXTRA_PAYMENT = REQUEST_EXTRA_PAYMENT;
+
+/**
+ * Checks if the transition asks for an extra payment with an amount above 0.
+ *
+ * @param {number} offerInSubunits
+ * @param {string} transitionName
+ * @returns {boolean}
+ */
+exports.isIntentionToRequestExtraPayment = (offerInSubunits, transitionName) => {
+  return transitionName === REQUEST_EXTRA_PAYMENT && offerInSubunits > 0;
+};
+
+// What Stripe charges to process the card payment. Withheld from the
+// technician's payout so the marketplace isn't paying the card fee itself.
+const STRIPE_FEE_PERCENTAGE = 3.2;
+
+// Its own line item rather than a commission: the marketplace takes no
+// commission on an extra payment, this is only the cost of moving the money.
+const STRIPE_FEE_CODE = 'line-item/stripe-fee';
+exports.STRIPE_FEE_CODE = STRIPE_FEE_CODE;
+
+/**
+ * The marketplace's own commission doesn't apply to an extra payment - it is
+ * money for work already agreed, not a new job being brokered.
+ *
+ * @returns {Object} { providerCommission, customerCommission }
+ */
+exports.getExtraPaymentCommissions = () => ({
+  providerCommission: null,
+  customerCommission: null,
+});
+
+/**
+ * The Stripe fee on an extra payment, as a line item taken off the technician's
+ * payout. The customer pays the amount that was asked for; the fee comes out of
+ * what is paid out, and stays with the marketplace to cover the card cost.
+ *
+ * @param {Money} amount the extra payment amount
+ * @returns {Array} the line item, or empty when there is no amount
+ */
+exports.getExtraPaymentStripeFeeLineItem = amount => {
+  if (!amount) {
+    return [];
+  }
+
+  return [
+    {
+      code: STRIPE_FEE_CODE,
+      unitPrice: amount,
+      percentage: -STRIPE_FEE_PERCENTAGE,
+      includeFor: ['provider'],
+    },
+  ];
+};
+
 // Once a payment has been confirmed the job is taken.
 exports.CONFIRM_PAYMENT = 'transition/confirm-payment';
 

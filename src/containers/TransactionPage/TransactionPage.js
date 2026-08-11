@@ -77,7 +77,9 @@ import SendMessageForm from './SendMessageForm/SendMessageForm';
 import TransactionPanel from './TransactionPanel/TransactionPanel';
 
 import {
+  fetchTransaction,
   makeTransition,
+  requestExtraPayment,
   sendMessage,
   sendReview,
   fetchMoreMessages,
@@ -372,6 +374,9 @@ export const TransactionPageComponent = props => {
     transitionInProgress,
     transitionError,
     onTransition,
+    onRequestExtraPayment,
+    onFetchTransaction,
+    extraPaymentTxs = [],
     nextTransitions,
     callSetInitialValues,
     onInitializeCardPaymentData,
@@ -518,6 +523,26 @@ export const TransactionPageComponent = props => {
   // This is called from action buttons
   const onOpenMakeCounterOfferModal = () => {
     setMakeCounterOfferModalOpen(true);
+  };
+
+  // A technician asks for an extra amount on a job that is already paid for.
+  // ActionButtons owns the modal and its progress state; this just makes the
+  // request and reloads so the new one shows up among the others.
+  const onSubmitExtraPaymentRequest = values => {
+    const { amount, reason } = values;
+
+    return onRequestExtraPayment({
+      parentTxId: transaction?.id,
+      listingId: listing?.id,
+      amountInSubunits: amount?.amount,
+      currency: amount?.currency || config.currency,
+      reason,
+    })
+      .unwrap()
+      .then(extraPaymentTx => {
+        onFetchTransaction(transaction?.id, transactionRole, config);
+        return extraPaymentTx;
+      });
   };
 
   // Submit review and close the review modal
@@ -701,6 +726,12 @@ export const TransactionPageComponent = props => {
       .catch(() => {});
   };
 
+  // The panel only renders the action buttons when the process has actions of
+  // its own. Extra payments sit outside that, so it needs telling.
+  const isJobPaidFor = txTransitions.some(t => t.transition === 'transition/confirm-payment');
+  const hasExtraPayment = extraPaymentTxs.length > 0;
+  const showExtraPaymentActions = (isProviderRole && isJobPaidFor) || hasExtraPayment;
+
   const showListingImage = requireListingImage(foundListingTypeConfig);
 
   if (isDataAvailable && isProviderRole && !isOwnSale) {
@@ -861,6 +892,7 @@ export const TransactionPageComponent = props => {
   const panel = isDataAvailable ? (
     <TransactionPanel
       className={detailsClassName}
+      showExtraPaymentActions={showExtraPaymentActions}
       currentUser={currentUser}
       transactionId={transaction?.id}
       listing={listing}
@@ -908,6 +940,12 @@ export const TransactionPageComponent = props => {
           containerId={containerId}
           listingTypeConfig={foundListingTypeConfig}
           showButtons={stateData.showActionButtons}
+          extraPaymentTxs={extraPaymentTxs}
+          onRequestExtraPayment={onSubmitExtraPaymentRequest}
+          onExtraPaymentUpdated={() => onFetchTransaction(transaction?.id, transactionRole, config)}
+          onManageDisableScrolling={onManageDisableScrolling}
+          currentUser={currentUser}
+          currencyConfig={currencyConfig}
           primaryButtonProps={stateData?.primaryButtonProps}
           secondaryButtonProps={stateData?.secondaryButtonProps}
           tertiaryButtonProps={stateData?.tertiaryButtonProps}
@@ -1196,6 +1234,7 @@ const TransactionPage = props => {
     fetchLineItemsError,
     fileUploadsDisabled,
     fileDownloads,
+    extraPaymentTxs,
   } = useSelector(state => state.TransactionPage, shallowEqual);
 
   const currentUser = useSelector(state => state.user?.currentUser);
@@ -1209,6 +1248,15 @@ const TransactionPage = props => {
   const fileUploads = useSelector(selectFileUploads, shallowEqual);
 
   // Dispatch callbacks
+  const onRequestExtraPayment = useCallback(params => dispatch(requestExtraPayment(params)), [
+    dispatch,
+  ]);
+
+  const onFetchTransaction = useCallback(
+    (id, txRole, config) => dispatch(fetchTransaction(id, txRole, config)),
+    [dispatch]
+  );
+
   const onTransition = useCallback(
     (txId, transitionName, params) => dispatch(makeTransition(txId, transitionName, params)),
     [dispatch]
@@ -1287,6 +1335,9 @@ const TransactionPage = props => {
       fileUploads={fileUploads}
       fileUploadsDisabled={fileUploadsDisabled}
       onTransition={onTransition}
+      onRequestExtraPayment={onRequestExtraPayment}
+      onFetchTransaction={onFetchTransaction}
+      extraPaymentTxs={extraPaymentTxs}
       onShowMoreMessages={onShowMoreMessages}
       onSendMessage={onSendMessage}
       onManageDisableScrolling={onManageDisableScrolling}

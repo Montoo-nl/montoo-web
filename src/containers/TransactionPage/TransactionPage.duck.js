@@ -11,7 +11,14 @@ import {
   stringifyDateToISO8601,
 } from '../../util/dates';
 import { isTransactionsTransitionInvalidTransition, storableError } from '../../util/errors';
-import { transactionLineItems, transitionPrivileged } from '../../util/api';
+import {
+  initiatePrivileged,
+  linkExtraPayment,
+  transactionLineItems,
+  transitionPrivileged,
+} from '../../util/api';
+import { EXTRA_PAYMENT_PROCESS_NAME } from '../../transactions/transaction';
+import { transitions as extraPaymentTransitions } from '../../transactions/transactionProcessExtraPayment';
 import * as log from '../../util/log';
 import {
   updatedEntities,
@@ -308,9 +315,51 @@ const fetchTransactionPayloadCreator = (
       dispatch(addMarketplaceEntities(response, sanitizeConfig));
       return response;
     })
+    .then(response => {
+      // Extra payment requests are transactions of their own. The job's
+      // metadata lists them, so they can be fetched before the page renders -
+      // otherwise the action buttons would flash without them.
+      const transaction = response?.data?.data;
+      const extraPaymentIds = transaction?.attributes?.metadata?.extraPayments || [];
+
+      return extraPaymentIds.length > 0
+        ? dispatch(fetchExtraPaymentsThunk({ extraPaymentIds })).then(() => response)
+        : response;
+    })
     .catch(e => {
       return rejectWithValue(storableError(e));
     });
+};
+
+/**
+ * The extra payment requests made against a job. Each is its own transaction on
+ * the extra-payment process; both parties are a party to them, so the regular
+ * SDK can read them.
+ */
+const fetchExtraPaymentsPayloadCreator = ({ extraPaymentIds }, { dispatch, extra: sdk }) => {
+  return Promise.all(
+    extraPaymentIds.map(txId =>
+      sdk.transactions
+        .show({ id: new UUID(txId), include: ['customer', 'provider'] })
+        .then(response => {
+          // These have to land in the entity store too: makeTransition looks
+          // the transaction up there to work out which process it belongs to,
+          // and a denormalised copy alone isn't enough.
+          dispatch(addMarketplaceEntities(response));
+          return denormalisedResponseEntities(response)[0];
+        })
+        .catch(() => null)
+    )
+  ).then(transactions => transactions.filter(Boolean));
+};
+
+export const fetchExtraPaymentsThunk = createAsyncThunk(
+  'TransactionPage/fetchExtraPayments',
+  fetchExtraPaymentsPayloadCreator
+);
+
+export const fetchExtraPayments = extraPaymentIds => dispatch => {
+  return dispatch(fetchExtraPaymentsThunk({ extraPaymentIds }));
 };
 
 export const fetchTransactionThunk = createAsyncThunk(
@@ -414,6 +463,75 @@ export const makeTransitionThunk = createAsyncThunk(
 // Backward compatible wrapper for makeTransition
 export const makeTransition = (txId, transitionName, params) => dispatch => {
   return dispatch(makeTransitionThunk({ txId, transitionName, params }));
+};
+
+///////////////////////////
+// Request extra payment //
+///////////////////////////
+
+/**
+ * A technician asks the company for an extra amount on a job that has already
+ * been paid for. Each request is a transaction of its own on the extra-payment
+ * process, tied to the job through protectedData.parentTxId.
+ *
+ * The transition is privileged: the amount comes from the request rather than
+ * from the listing's price, so the line items have to be built on the server.
+ */
+const requestExtraPaymentPayloadCreator = (
+  { parentTxId, listingId, amountInSubunits, currency, reason },
+  { rejectWithValue }
+) => {
+  const orderData = { actor: 'provider', offerInSubunits: amountInSubunits, currency };
+  const bodyParams = {
+    processAlias: `${EXTRA_PAYMENT_PROCESS_NAME}/release-1`,
+    transition: extraPaymentTransitions.REQUEST_EXTRA_PAYMENT,
+    params: {
+      listingId,
+      protectedData: {
+        parentTxId: parentTxId?.uuid || parentTxId,
+        extraPaymentReason: reason,
+      },
+    },
+  };
+  const queryParams = { include: ['customer', 'provider', 'listing'], expand: true };
+
+  return initiatePrivileged({ isSpeculative: false, orderData, bodyParams, queryParams })
+    .then(response => denormalisedResponseEntities(response)[0])
+    .then(extraPaymentTx => {
+      // Record the request on the job, so the transaction page can find it.
+      // The link is written to metadata, which only the Integration API can
+      // touch - hence the round trip through the app's own server.
+      return linkExtraPayment({
+        parentTxId: parentTxId?.uuid || parentTxId,
+        extraPaymentTxId: extraPaymentTx?.id?.uuid,
+      })
+        .then(() => extraPaymentTx)
+        .catch(e => {
+          // The request itself went through, so don't fail the whole thing.
+          // Without the link it just won't show up on the job page.
+          log.error(e, 'link-extra-payment-failed', {
+            parentTxId: parentTxId?.uuid || parentTxId,
+            extraPaymentTxId: extraPaymentTx?.id?.uuid,
+          });
+          return extraPaymentTx;
+        });
+    })
+    .catch(e => {
+      log.error(e, 'request-extra-payment-failed', {
+        parentTxId: parentTxId?.uuid || parentTxId,
+        amountInSubunits,
+      });
+      return rejectWithValue(storableError(e));
+    });
+};
+
+export const requestExtraPaymentThunk = createAsyncThunk(
+  'TransactionPage/requestExtraPayment',
+  requestExtraPaymentPayloadCreator
+);
+
+export const requestExtraPayment = params => dispatch => {
+  return dispatch(requestExtraPaymentThunk(params));
 };
 
 ////////////////////
@@ -823,6 +941,9 @@ const initialState = {
   fetchTransactionInProgress: false,
   fetchTransactionError: null,
   transactionRef: null,
+  // Extra payment requests made against this job, denormalised. They are
+  // separate transactions, listed in the job's metadata.
+  extraPaymentTxs: [],
   transitionInProgress: null,
   transitionError: null,
   fetchMessagesInProgress: false,
@@ -942,6 +1063,13 @@ const transactionPageSlice = createSlice({
       .addCase(fetchTransactionThunk.rejected, (state, action) => {
         state.fetchTransactionInProgress = false;
         state.fetchTransactionError = action.payload;
+      })
+      // fetchExtraPayments cases
+      .addCase(fetchExtraPaymentsThunk.fulfilled, (state, action) => {
+        state.extraPaymentTxs = action.payload || [];
+      })
+      .addCase(fetchExtraPaymentsThunk.rejected, state => {
+        state.extraPaymentTxs = [];
       })
       // fetchTransitions cases
       .addCase(fetchTransitionsThunk.pending, state => {

@@ -1,9 +1,15 @@
 const sharetribeSdk = require('sharetribe-flex-sdk');
 const { transactionLineItems } = require('../api-util/lineItems');
-const { isIntentionToMakeOffer } = require('../api-util/negotiation');
+const {
+  getExtraPaymentCommissions,
+  getExtraPaymentStripeFeeLineItem,
+  isIntentionToMakeOffer,
+  isIntentionToRequestExtraPayment,
+} = require('../api-util/negotiation');
 const {
   getSdk,
   getTrustedSdk,
+  getIntegrationSdk,
   handleError,
   serialize,
   fetchCommission,
@@ -13,11 +19,24 @@ const { Money } = sharetribeSdk.types;
 
 const listingPromise = (sdk, id) => sdk.listings.show({ id });
 
+const LISTING_STATE_CLOSED = 'closed';
+
+// Note: the Integration SDK has its own UUID type and won't serialize the one
+// the Marketplace SDK returns, so ids have to be rebuilt when crossing over.
+const integrationSdkTypes = require('sharetribe-flex-integration-sdk').types;
+const toIntegrationUUID = id => new integrationSdkTypes.UUID(id?.uuid || id);
+
 const getFullOrderData = (orderData, bodyParams, currency) => {
   const { offerInSubunits } = orderData || {};
   const transitionName = bodyParams.transition;
 
-  return isIntentionToMakeOffer(offerInSubunits, transitionName)
+  // An extra payment names its amount the same way an offer does, so the line
+  // items are built from it in the same way.
+  const isAmountFromRequest =
+    isIntentionToMakeOffer(offerInSubunits, transitionName) ||
+    isIntentionToRequestExtraPayment(offerInSubunits, transitionName);
+
+  return isAmountFromRequest
     ? {
         ...orderData,
         ...bodyParams.params,
@@ -55,22 +74,61 @@ module.exports = (req, res) => {
   let lineItems = null;
   let metadataMaybe = {};
 
+  // A job is closed once it has been paid for, and the Marketplace API won't
+  // start a transaction against a closed listing. An extra payment is asked for
+  // after that point, so the listing is opened for the initiate and closed
+  // again straight after. Set to the listing id only when we did the opening,
+  // so a job that was already open is left alone.
+  let listingToReclose = null;
+
+  const recloseListingMaybe = () => {
+    if (!listingToReclose) {
+      return Promise.resolve();
+    }
+    return getIntegrationSdk()
+      .listings.close({ id: toIntegrationUUID(listingToReclose) })
+      .catch(e => {
+        // Leaving it open would let the job take new offers again, so this is
+        // worth shouting about - but not worth failing the request that already
+        // went through.
+        console.error('Failed to re-close listing after extra payment:', e.message);
+      });
+  };
+
   Promise.all([listingPromise(sdk, bodyParams?.params?.listingId), fetchCommission(sdk)])
     .then(([showListingResponse, fetchAssetsResponse]) => {
       const listing = showListingResponse.data.data;
       const commissionAsset = fetchAssetsResponse.data.data[0];
 
       const currency = listing.attributes.price?.currency || orderData.currency;
-      const { providerCommission, customerCommission } =
+      const marketplaceCommissions =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      lineItems = transactionLineItems(
-        listing,
-        getFullOrderData(orderData, bodyParams, currency),
-        providerCommission,
-        customerCommission
+      // An extra payment doesn't carry the marketplace's own commission - only
+      // enough to cover the card fee.
+      const isExtraPayment = isIntentionToRequestExtraPayment(
+        orderData?.offerInSubunits,
+        transitionName
       );
+      const { providerCommission, customerCommission } = isExtraPayment
+        ? getExtraPaymentCommissions()
+        : marketplaceCommissions;
+
+      const fullOrderData = getFullOrderData(orderData, bodyParams, currency);
+
+      lineItems = [
+        ...transactionLineItems(listing, fullOrderData, providerCommission, customerCommission),
+        // The card fee is its own line item, taken off the payout
+        ...(isExtraPayment ? getExtraPaymentStripeFeeLineItem(fullOrderData.offer) : []),
+      ];
       metadataMaybe = getMetadata(orderData, transitionName);
+
+      if (isExtraPayment && listing.attributes?.state === LISTING_STATE_CLOSED) {
+        listingToReclose = listing.id;
+        return getIntegrationSdk()
+          .listings.open({ id: toIntegrationUUID(listing.id) })
+          .then(() => getTrustedSdk(req));
+      }
 
       return getTrustedSdk(req);
     })
@@ -92,6 +150,7 @@ module.exports = (req, res) => {
       }
       return trustedSdk.transactions.initiate(body, queryParams);
     })
+    .then(apiResponse => recloseListingMaybe().then(() => apiResponse))
     .then(apiResponse => {
       const { status, statusText, data } = apiResponse;
       res
@@ -107,6 +166,7 @@ module.exports = (req, res) => {
         .end();
     })
     .catch(e => {
-      handleError(res, e);
+      // The listing has to go back to closed even if the initiate failed
+      recloseListingMaybe().then(() => handleError(res, e));
     });
 };

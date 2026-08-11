@@ -1,0 +1,95 @@
+;; Extra payment
+;;
+;; A technician who has already been paid for a job can ask the company for an
+;; extra amount - unforeseen work, extra materials, a longer day than quoted.
+;;
+;; Each request is its own transaction on the same listing. The transaction it
+;; belongs to is written to protectedData as `parentTxId`, so both the app and
+;; the notification emails can link back to the original job.
+;;
+;; The flow mirrors the main payment flow: the provider names the amount, the
+;; customer pays it from a modal on the transaction page.
+{:format :v3,
+ :transitions
+ [;; The technician asks for the extra amount. Privileged, because the amount
+  ;; comes from the request rather than from the listing's price.
+  {:name :transition/request-extra-payment,
+   :to :state/payment-requested,
+   :actor :actor.role/provider,
+   :actions
+   [{:name :action/privileged-set-line-items}
+    {:name :action/update-protected-data}],
+   :privileged? true}
+
+  ;; The customer opens the payment modal: this creates the payment intent that
+  ;; the browser then confirms with Stripe.
+  {:name :transition/initiate-payment,
+   :from :state/payment-requested,
+   :to :state/pending-confirmation,
+   :actor :actor.role/customer,
+   :actions [{:name :action/stripe-create-payment-intent}]}
+
+  ;; Card confirmed. The money is captured and paid out to the technician in one
+  ;; go - there is nothing left to deliver, the work is already done.
+  {:name :transition/confirm-payment,
+   :from :state/pending-confirmation,
+   :to :state/paid,
+   :actor :actor.role/customer,
+   :actions
+   [{:name :action/stripe-confirm-payment-intent}
+    {:name :action/stripe-capture-payment-intent}
+    {:name :action/stripe-create-payout}]}
+
+  ;; The customer doesn't agree with the request.
+  {:name :transition/decline,
+   :from :state/payment-requested,
+   :to :state/declined,
+   :actor :actor.role/customer,
+   :actions []}
+
+  ;; The technician takes the request back.
+  {:name :transition/withdraw,
+   :from :state/payment-requested,
+   :to :state/declined,
+   :actor :actor.role/provider,
+   :actions []}
+
+  {:name :transition/operator-decline,
+   :from :state/payment-requested,
+   :to :state/declined,
+   :actor :actor.role/operator,
+   :actions []}
+
+  ;; A request that is never answered stops being payable after a week.
+  {:name :transition/expire,
+   :from :state/payment-requested,
+   :to :state/expired,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/payment-requested]}
+     {:fn/period ["P7D"]}]},
+   :actions []}
+
+  ;; The customer opened the modal but never confirmed the card.
+  {:name :transition/expire-payment,
+   :from :state/pending-confirmation,
+   :to :state/expired,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/pending-confirmation]}
+     {:fn/period ["P7D"]}]},
+   :actions []}],
+
+ :notifications
+ [{:name :notification/extra-payment-requested,
+   :on :transition/request-extra-payment,
+   :to :actor.role/customer,
+   :template :extra-payment-requested}
+  {:name :notification/extra-payment-paid,
+   :on :transition/confirm-payment,
+   :to :actor.role/provider,
+   :template :extra-payment-paid}
+  {:name :notification/extra-payment-declined,
+   :on :transition/decline,
+   :to :actor.role/provider,
+   :template :extra-payment-declined}]}

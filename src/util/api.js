@@ -169,6 +169,14 @@ export const awardJob = body => {
   return post('/api/award-job', body);
 };
 
+// Record an extra payment request on the job it belongs to, by writing the
+// request's id into the job transaction's metadata.
+//
+// See `server/api/link-extra-payment.js`. Body: { parentTxId, extraPaymentTxId }.
+export const linkExtraPayment = body => {
+  return post('/api/link-extra-payment', body);
+};
+
 // Ask the backend for presigned URLs that allow uploading files straight
 // from the browser to the marketplace's own file storage.
 //

@@ -1,0 +1,91 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+
+  @media (--viewportMedium) {
+    flex-basis: 567px;
+  }
+}
+
+.modalContent {
+  flex-grow: 1;
+}
+
+/* Title of the modal */
+.modalTitle {
+  composes: marketplaceModalTitleStyles from global;
+}
+
+/* Paragraph for the Modal */
+.modalMessage {
+  composes: marketplaceModalParagraphStyles from global;
+}
+
+.formRoot {
+  display: flex;
+  flex-direction: column;
+
+  /* Layout: size and positioning */
+  width: 100%;
+  height: auto;
+  margin-top: 24px;
+}
+
+.amount {
+  margin-bottom: 24px;
+}
+
+.reason {
+  margin-bottom: 8px;
+}
+
+/* What the technician actually receives once Stripe has taken its cut */
+.breakdown {
+  margin: 0 0 24px 0;
+  padding: 12px 16px;
+  border-radius: var(--borderRadiusMedium);
+  border: 1px solid var(--colorGrey100);
+  background-color: var(--colorGrey50);
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--colorGrey700);
+  padding: 2px 0;
+}
+
+.breakdownTotal {
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--colorBlack);
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--colorGrey100);
+}
+
+.breakdownNote {
+  font-size: 13px;
+  line-height: 18px;
+  margin: 8px 0 0 0;
+  color: var(--colorGrey500);
+}
+
+.errorPlaceholder {
+  color: var(--colorFail);
+
+  @media (--viewportMedium) {
+    margin: 0;
+    width: 100%;
+    min-height: 32px;
+  }
+}
+
+.submitButton {
+  margin-top: 16px;
+}

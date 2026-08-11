@@ -1,0 +1,89 @@
+@import '../../../styles/customMediaQueries.css';
+
+.root {
+  composes: marketplaceModalBaseStyles from global;
+  padding-top: 70px;
+
+  @media (--viewportMedium) {
+    flex-basis: 567px;
+  }
+}
+
+.modalContent {
+  flex-grow: 1;
+}
+
+.modalTitle {
+  composes: marketplaceModalTitleStyles from global;
+}
+
+.modalMessage {
+  composes: marketplaceModalParagraphStyles from global;
+}
+
+.details {
+  margin: 24px 0;
+  padding: 16px;
+  border-radius: var(--borderRadiusMedium);
+  border: 1px solid var(--colorGrey100);
+  background-color: var(--colorGrey50);
+}
+
+.detailRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.detailReason {
+  margin-top: 16px;
+}
+
+.detailLabel {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--colorGrey700);
+}
+
+.detailValue {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--colorBlack);
+}
+
+.reasonText {
+  font-size: 15px;
+  line-height: 22px;
+  margin: 4px 0 0 0;
+  color: var(--colorGrey700);
+  white-space: pre-wrap;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.paymentForm {
+  margin-top: 24px;
+}
+
+.error {
+  font-size: 14px;
+  line-height: 20px;
+  margin: 8px 0 0 0;
+  color: var(--colorFail);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+  color: var(--marketplaceColor);
+}

@@ -25,6 +25,7 @@ const middleware = require('./middleware');
 const generatePresignedUrl = require('./api/presigned-url');
 const offerAvailability = require('./api/offer-availability');
 const awardJob = require('./api/award-job');
+const linkExtraPayment = require('./api/link-extra-payment');
 const updateAggregateRating = require('./api/update-aggregate-rating');
 
 const router = express.Router();
@@ -94,5 +95,7 @@ router.post('/update-aggregate-rating', middleware.auth, updateAggregateRating);
 router.post('/offer-availability', middleware.auth, offerAvailability);
 
 router.post('/award-job', middleware.auth, awardJob);
+
+router.post('/link-extra-payment', middleware.auth, linkExtraPayment);
 
 module.exports = router;

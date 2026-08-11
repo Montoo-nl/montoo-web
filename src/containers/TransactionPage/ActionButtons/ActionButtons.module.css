@@ -71,3 +71,49 @@
   color: var(--colorGrey700);
   margin-top: 4px;
 }
+
+/* Extra payments: asking for one, and answering one. Not part of the job's own
+   process, so they sit below the process's action buttons. */
+.extraPayments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.extraPaymentStatus {
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+  padding: 12px 0;
+  color: var(--colorGrey600);
+  text-align: center;
+}
+
+/* What the technician actually receives from an extra payment */
+.extraPaymentBreakdown {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--borderRadiusMedium);
+  border: 1px solid var(--colorGrey100);
+  background-color: var(--colorGrey50);
+}
+
+.extraPaymentRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 2px 0;
+  color: var(--colorGrey700);
+}
+
+.extraPaymentTotal {
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--colorBlack);
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--colorGrey100);
+}
