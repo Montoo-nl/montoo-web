@@ -22,6 +22,11 @@ export const ACCEPTED_DOCUMENT_MIME_TYPES = [
 // Value for the `accept` attribute of a file input.
 export const ACCEPTED_DOCUMENT_TYPES = '.pdf,.jpg,.jpeg,.png';
 
+// Images a technician shows off their work with. Kept in sync with
+// `allowedFileTypes.image` in server/config/media.js.
+export const ACCEPTED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+export const ACCEPTED_IMAGE_TYPES = '.jpg,.jpeg,.png,.webp';
+
 // The presigned URL endpoint doesn't enforce a size limit, so the browser has
 // to. 5MB matches `maxFileSizeByCategory.document` in server/config/media.js.
 export const MAX_DOCUMENT_FILE_SIZE = 5 * 1024 * 1024;

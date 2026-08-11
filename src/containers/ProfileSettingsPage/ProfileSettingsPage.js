@@ -50,6 +50,19 @@ const pickUploadedCertificates = (certificates, certificateTypeOptions) => {
   return Object.keys(uploaded).length > 0 ? uploaded : null;
 };
 
+// Years of experience per specialisation, kept to the specialisations that are
+// actually selected - so unticking one doesn't leave its years behind. An
+// emptied field, a missing entry, or anything that isn't a positive whole
+// number is saved as 0, so every selected specialisation always has a number.
+const pickSpecialisationExperience = (specialisations, experience) => {
+  const picked = (specialisations || []).reduce((years, key) => {
+    const value = Number.parseInt(experience?.[key], 10);
+    return { ...years, [key]: Number.isFinite(value) && value > 0 ? value : 0 };
+  }, {});
+
+  return Object.keys(picked).length > 0 ? picked : null;
+};
+
 // A user whose profile hasn't been approved yet. The other states are 'active'
 // and 'banned'.
 const USER_STATE_PENDING_APPROVAL = 'pendingApproval';
@@ -299,8 +312,11 @@ export const ProfileSettingsPageComponent = props => {
       lastName,
       displayName,
       bio: rawBio,
-      serviceArea,
+      serviceAreas,
       specialisations,
+      specialisationExperience,
+      hasCompanyVan,
+      portfolio,
       identityDocument,
       insuranceDocument,
       certificates,
@@ -318,8 +334,20 @@ export const ProfileSettingsPageComponent = props => {
     // them. The documents themselves are only shared with transaction parties.
     const technicianPublicDataMaybe = isTechnician
       ? {
-          serviceArea: serviceArea?.trim() || null,
+          serviceAreas: serviceAreas?.length > 0 ? serviceAreas : null,
+          // The service area used to be a free-text field. Clear whatever a
+          // technician wrote there, now that it is a list of provinces.
+          serviceArea: null,
           specialisations: specialisations?.length > 0 ? specialisations : null,
+          specialisationExperience: pickSpecialisationExperience(
+            specialisations,
+            specialisationExperience
+          ),
+          // FieldBoolean gives '' when the question is left unanswered
+          hasCompanyVan: typeof hasCompanyVan === 'boolean' ? hasCompanyVan : null,
+          // Work images are meant to be seen, so they are public alongside the
+          // rest of what a company looks at when picking a technician.
+          portfolio: portfolio?.length > 0 ? portfolio : null,
         }
       : {};
     const technicianProtectedDataMaybe = isTechnician
@@ -390,8 +418,11 @@ export const ProfileSettingsPageComponent = props => {
   // Final Form reinitialize the form and discard the user's input.
   const technicianInitialValuesMaybe = isTechnician
     ? {
-        serviceArea: publicData?.serviceArea,
+        serviceAreas: publicData?.serviceAreas,
         specialisations: publicData?.specialisations,
+        specialisationExperience: publicData?.specialisationExperience,
+        hasCompanyVan: publicData?.hasCompanyVan,
+        portfolio: publicData?.portfolio,
         identityDocument: protectedData?.identityDocument,
         insuranceDocument: protectedData?.insuranceDocument,
         certificates: protectedData?.certificates,

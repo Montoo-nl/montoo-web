@@ -22,6 +22,29 @@ export const CERTIFICATIONS_LISTING_FIELD_KEY = 'certifications';
 export const CATEGORY_LEVEL_1_KEY = 'categoryLevel1';
 
 /**
+ * The regions a technician can say they work in: the twelve provinces of the
+ * Netherlands. Saved as an array of keys to publicData.serviceAreas.
+ *
+ * These are fixed geography rather than hosted configuration, so they live
+ * here. The labels are the Dutch names, which is how they are written on a
+ * Dutch marketplace regardless of the UI language.
+ */
+export const SERVICE_AREA_OPTIONS = [
+  { key: 'drenthe', label: 'Drenthe' },
+  { key: 'flevoland', label: 'Flevoland' },
+  { key: 'friesland', label: 'Friesland' },
+  { key: 'gelderland', label: 'Gelderland' },
+  { key: 'groningen', label: 'Groningen' },
+  { key: 'limburg', label: 'Limburg' },
+  { key: 'noord-brabant', label: 'Noord-Brabant' },
+  { key: 'noord-holland', label: 'Noord-Holland' },
+  { key: 'overijssel', label: 'Overijssel' },
+  { key: 'utrecht', label: 'Utrecht' },
+  { key: 'zeeland', label: 'Zeeland' },
+  { key: 'zuid-holland', label: 'Zuid-Holland' },
+];
+
+/**
  * The specialisations a technician can pick, i.e. the top level (level 1)
  * categories from the hosted configuration. Saved as an array of category ids
  * to the user's publicData.specialisations.
@@ -142,6 +165,7 @@ export const getMissingJobRequirements = (listingPublicData, currentUser, config
  * separated from another's in the bucket.
  */
 export const identityDocumentStoragePath = userId => `profiles/${userId}/identity`;
+export const portfolioStoragePath = userId => `profiles/${userId}/portfolio`;
 export const insuranceDocumentStoragePath = userId => `profiles/${userId}/insurance`;
 export const certificateStoragePath = (userId, certificateType) =>
   `certifications/${userId}/${certificateType}`;

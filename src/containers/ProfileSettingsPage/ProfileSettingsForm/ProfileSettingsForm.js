@@ -13,11 +13,13 @@ import * as validators from '../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../util/errors';
 import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
 import {
+  SERVICE_AREA_OPTIONS,
   certificateStoragePath,
   getCertificateTypeOptions,
   getSpecialisationOptions,
   identityDocumentStoragePath,
   insuranceDocumentStoragePath,
+  portfolioStoragePath,
 } from '../../../config/configTechnician';
 
 import {
@@ -26,12 +28,16 @@ import {
   Button,
   ImageFromFile,
   IconSpinner,
+  FieldBoolean,
+  FieldCheckbox,
   FieldCheckboxGroup,
   FieldFileUpload,
   FieldTextInput,
   H4,
   CustomExtendedDataField,
 } from '../../../components';
+
+import PortfolioField, { MAX_PORTFOLIO_IMAGES } from './PortfolioField';
 
 import css from './ProfileSettingsForm.module.css';
 
@@ -81,6 +87,91 @@ const DisplayNameMaybe = props => {
         <FormattedMessage id="ProfileSettingsForm.displayNameInfo" />
       </p>
     </div>
+  );
+};
+
+/**
+ * Keeps the years of experience a whole, non-negative number as it is typed.
+ * Everything that isn't a digit is dropped - so '2.5' becomes 25, '-3' becomes
+ * 3 - and parseInt takes the leading zeros off '012'. An emptied field stays
+ * empty, so that the user can clear it and type a new number.
+ *
+ * @param {string|number} value raw field value
+ * @returns {number|string} a whole number, or '' for an empty field
+ */
+const parseExperienceYears = value => {
+  const digits = `${value ?? ''}`.replace(/\D/g, '');
+  return digits === '' ? '' : Number.parseInt(digits, 10);
+};
+
+/**
+ * The specialisations a technician works in, each with the years of experience
+ * they have in it. The number field only appears once the specialisation is
+ * ticked, and starts at 0.
+ *
+ * Stored as two separate keys in publicData, so that the plain list of ids
+ * stays usable for matching a technician against a job:
+ *   specialisations: ['elektrotechniek', 'ventilatie']
+ *   specialisationExperience: { elektrotechniek: 7, ventilatie: 2 }
+ *
+ * @param {Object} props
+ * @param {Array<Object>} props.options - Specialisations as [{ key, label }]
+ * @param {Array<string>} props.selected - Currently ticked specialisation ids
+ * @param {Object} [props.savedExperience] - Years already saved, keyed by specialisation id
+ * @param {string} [props.formId] - The form id, used to build field ids
+ * @param {intlShape} props.intl - The intl object
+ * @returns {JSX.Element}
+ */
+const SpecialisationsField = props => {
+  const { options, selected = [], savedExperience, formId = 'ProfileSettingsForm', intl } = props;
+
+  return (
+    <ul className={css.specialisationList}>
+      {options.map(({ key, label }) => {
+        const fieldId = `${formId}.specialisation_${key}`;
+        const isSelected = selected.includes(key);
+
+        return (
+          <li key={key} className={css.specialisationRow}>
+            <FieldCheckbox
+              className={css.specialisationCheckbox}
+              id={fieldId}
+              name="specialisations"
+              value={key}
+              label={label}
+            />
+
+            {isSelected ? (
+              <div className={css.experience}>
+                <FieldTextInput
+                  className={css.experienceField}
+                  // Note: a text input rather than type="number". A number
+                  // input reports an empty string for half-typed values like
+                  // '2.', which makes the field clear itself mid-typing.
+                  type="text"
+                  inputMode="numeric"
+                  id={`${fieldId}.experience`}
+                  name={`specialisationExperience.${key}`}
+                  parse={parseExperienceYears}
+                  // Note: a field-level initialValue overwrites the form's own
+                  // initialValues at this path when the field registers, so it
+                  // has to carry the saved number. A plain 0 here would wipe
+                  // the saved years every time the page is opened.
+                  initialValue={savedExperience?.[key] ?? 0}
+                  aria-label={intl.formatMessage(
+                    { id: 'ProfileSettingsForm.specialisationExperienceLabel' },
+                    { specialisation: label }
+                  )}
+                />
+                <span className={css.experienceUnit}>
+                  <FormattedMessage id="ProfileSettingsForm.specialisationExperienceUnit" />
+                </span>
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 };
 
@@ -284,12 +375,21 @@ const CompanyDetailsMaybe = props => {
  * @param {boolean} props.isTechnician - Whether the current user has the provider role
  * @param {string} props.currentUserId - UUID of the current user, used in the storage path
  * @param {Object} props.values - Current form values
+ * @param {Object} props.initialValues - The form's initial values, i.e. what is saved
  * @param {Function} props.onUploadStateChange - Called with (fieldName, isUploading)
  * @param {intlShape} props.intl - The intl object
  * @returns {JSX.Element|null}
  */
 const TechnicianDetailsMaybe = props => {
-  const { isTechnician, currentUserId, values, onUploadStateChange, intl } = props;
+  const {
+    isTechnician,
+    currentUserId,
+    values,
+    initialValues,
+    formId,
+    onUploadStateChange,
+    intl,
+  } = props;
   const config = useConfiguration();
 
   if (!isTechnician || !currentUserId) {
@@ -314,13 +414,15 @@ const TechnicianDetailsMaybe = props => {
         <H4 as="h2" className={css.sectionTitle}>
           <FormattedMessage id="ProfileSettingsForm.serviceAreaHeading" />
         </H4>
-        <FieldTextInput
-          type="textarea"
-          id="serviceArea"
-          name="serviceArea"
-          label={intl.formatMessage({ id: 'ProfileSettingsForm.serviceAreaLabel' })}
-          placeholder={intl.formatMessage({ id: 'ProfileSettingsForm.serviceAreaPlaceholder' })}
+        <FieldCheckboxGroup
+          id={formId ? `${formId}.serviceAreas` : 'serviceAreas'}
+          name="serviceAreas"
+          options={SERVICE_AREA_OPTIONS}
+          twoColumns
         />
+        <p className={css.extraInfo}>
+          <FormattedMessage id="ProfileSettingsForm.serviceAreaInfo" />
+        </p>
       </div>
 
       {specialisationOptions.length > 0 ? (
@@ -328,17 +430,31 @@ const TechnicianDetailsMaybe = props => {
           <H4 as="h2" className={css.sectionTitle}>
             <FormattedMessage id="ProfileSettingsForm.specialisationsHeading" />
           </H4>
-          <FieldCheckboxGroup
-            id="specialisations"
-            name="specialisations"
+          <SpecialisationsField
             options={specialisationOptions}
-            twoColumns
+            selected={values?.specialisations}
+            savedExperience={initialValues?.specialisationExperience}
+            formId={formId}
+            intl={intl}
           />
           <p className={css.extraInfo}>
             <FormattedMessage id="ProfileSettingsForm.specialisationsInfo" />
           </p>
         </div>
       ) : null}
+
+      <div className={css.sectionContainer}>
+        <H4 as="h2" className={css.sectionTitle}>
+          <FormattedMessage id="ProfileSettingsForm.equipmentHeading" />
+        </H4>
+        <FieldBoolean
+          className={css.companyVan}
+          id={formId ? `${formId}.hasCompanyVan` : 'hasCompanyVan'}
+          name="hasCompanyVan"
+          label={intl.formatMessage({ id: 'ProfileSettingsForm.hasCompanyVanLabel' })}
+          placeholder={intl.formatMessage({ id: 'ProfileSettingsForm.hasCompanyVanPlaceholder' })}
+        />
+      </div>
 
       <div className={css.sectionContainer}>
         <H4 as="h2" className={css.sectionTitle}>
@@ -384,6 +500,24 @@ const TechnicianDetailsMaybe = props => {
           />
         </div>
       ) : null}
+
+      <div className={css.sectionContainer}>
+        <H4 as="h2" className={css.sectionTitle}>
+          <FormattedMessage id="ProfileSettingsForm.portfolioHeading" />
+        </H4>
+        <p className={css.documentsInfo}>
+          <FormattedMessage
+            id="ProfileSettingsForm.portfolioInfo"
+            values={{ maxImages: MAX_PORTFOLIO_IMAGES }}
+          />
+        </p>
+        <PortfolioField
+          id={formId ? `${formId}.portfolio` : 'portfolio'}
+          name="portfolio"
+          storagePath={portfolioStoragePath(currentUserId)}
+          onUploadStateChange={onUploadStateChange}
+        />
+      </div>
     </>
   );
 };
@@ -475,6 +609,7 @@ class ProfileSettingsFormComponent extends Component {
             formId,
             marketplaceName,
             values,
+            initialValues,
             userFields,
             userTypeConfig,
             isTechnician,
@@ -732,6 +867,8 @@ class ProfileSettingsFormComponent extends Component {
                 isTechnician={isTechnician}
                 currentUserId={user.id?.uuid}
                 values={values}
+                initialValues={initialValues}
+                formId={formId}
                 onUploadStateChange={this.handleFileUploadStateChange}
                 intl={intl}
               />

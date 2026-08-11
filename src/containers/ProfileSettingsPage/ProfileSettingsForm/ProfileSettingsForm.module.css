@@ -290,6 +290,61 @@
   }
 }
 
+/* Specialisations: one row per option, with the years of experience appearing
+   next to it once the option is ticked. */
+.specialisationList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.specialisationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 40px;
+  padding: 0;
+  margin: 0 0 12px 0;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.specialisationCheckbox {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.experience {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.experienceField {
+  width: 84px;
+}
+
+/* Targets the input element itself - FieldTextInput's own inputRootClass prop
+   would replace the class that carries the validation error styling. */
+.experienceField input {
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.experienceUnit {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--colorGrey600);
+}
+
+.companyVan {
+  max-width: 320px;
+}
+
 .companyField {
   margin-bottom: 24px;
 
