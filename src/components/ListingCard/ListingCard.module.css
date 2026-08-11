@@ -90,7 +90,7 @@ line-clamp: 1;
 -webkit-box-orient: vertical;
 display: -webkit-box;
 max-width: 100%;
-
+line-height: 30px;
 }
 
 .meta {
