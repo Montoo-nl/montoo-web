@@ -16,6 +16,8 @@ import SectionListings from './SectionListings';
 // TODO: alternatively, we could consider more in-place way of theming components
 import css from './SectionBuilder.module.css';
 import SectionFooter from './SectionFooter';
+import { useSelector } from 'react-redux';
+import { hasPermissionToViewData } from '../../../util/userHelpers';
 
 // These are shared classes.
 // Use these to have consistent styles between different section components
@@ -84,6 +86,7 @@ const defaultSectionComponents = {
  * @returns {JSX.Element} element containing array of sections according from given config array.
  */
 const SectionBuilder = props => {
+  const { currentUser } = useSelector(state => state.user);
   const { sections = [], options } = props;
   const { sectionComponents = {}, isInsideContainer, ...otherOption } = options || {};
 
@@ -116,11 +119,14 @@ const SectionBuilder = props => {
     }
   };
 
+  const userCanViewData = hasPermissionToViewData(currentUser);
   // Resolve all section ids
-  const sectionsWithResolvedIds = sections.map((section, index) => ({
-    ...section,
-    sectionId: getUniqueSectionId(section.sectionId, index),
-  }));
+  const sectionsWithResolvedIds = sections
+    .map((section, index) => ({
+      ...section,
+      sectionId: getUniqueSectionId(section.sectionId, index),
+    }))
+    .filter(section => !(section.sectionId === 'section-listing' && !userCanViewData));
 
   return (
     <>
