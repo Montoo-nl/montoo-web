@@ -12,6 +12,7 @@ import {
   hasPermissionToInitiateTransactions,
   hasPermissionToPostListings,
   hasPermissionToViewData,
+  initialsDisplayName,
   initialValuesForUserFields,
   isUserAuthorized,
   pickUserFieldsData,
@@ -323,7 +324,13 @@ export const ProfileSettingsPageComponent = props => {
       ...rest
     } = values;
 
-    const displayNameMaybe = displayName
+    // A company isn't shown the field, so their display name is always the
+    // initials of the first and last name. Everyone else keeps what they typed,
+    // and null lets the Marketplace API fall back to its own default.
+    const companyDisplayName = initialsDisplayName(firstName, lastName);
+    const displayNameMaybe = isCompany
+      ? { displayName: companyDisplayName || null }
+      : displayName
       ? { displayName: displayName.trim() }
       : { displayName: null };
 
@@ -409,7 +416,8 @@ export const ProfileSettingsPageComponent = props => {
   const profileImageId = user.profileImage ? user.profileImage.id : null;
   const profileImage = image || { imageId: profileImageId };
   const userTypeConfig = userTypes.find(config => config.userType === userType);
-  const isDisplayNameIncluded = userTypeConfig?.defaultUserFields?.displayName !== false;
+  const isDisplayNameIncluded =
+    !isCompany && userTypeConfig?.defaultUserFields?.displayName !== false;
   // ProfileSettingsForm decides if it's allowed to show the input field.
   const displayNameMaybe = isDisplayNameIncluded && displayName ? { displayName } : {};
 

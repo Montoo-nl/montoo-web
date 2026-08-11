@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 
 import { isEmpty } from '../../util/common';
-import { pickUserFieldsData, addScopePrefix } from '../../util/userHelpers';
+import { pickUserFieldsData, addScopePrefix, initialsDisplayName } from '../../util/userHelpers';
 import { pickReferralData } from '../../util/webStorageHelpers';
 
 // Returns full userType config based on selected userType
@@ -9,6 +9,18 @@ const getUserTypeConfig = (userType, userTypes) => {
   return userTypes.find(config => {
     return config.userType === userType;
   });
+};
+
+// Companies (the 'customer' role) aren't shown the display name field, so their
+// display name is built from the initials instead of being typed.
+const getDisplayNameMaybe = (userTypeConfig, displayName, firstName, lastName) => {
+  const isCompany = userTypeConfig?.roles?.customer === true;
+
+  if (isCompany) {
+    const initials = initialsDisplayName(firstName, lastName);
+    return initials ? { displayName: initials } : {};
+  }
+  return displayName ? { displayName: displayName.trim() } : {};
 };
 
 /**
@@ -82,11 +94,12 @@ export const getExtendedDataMaybe = (submitValues, userType, userFields, extraDa
  */
 export const getHandleSubmitSignup = ({ submitSignup, userFields, userTypes }) => values => {
   const { userType, email, password, fname, lname, displayName, ...rest } = values;
-  const displayNameMaybe = displayName ? { displayName: displayName.trim() } : {};
 
   // Set referral to user private data if it exists and is valid
   const userTypeConfig = getUserTypeConfig(userType, userTypes);
   const extraPrivateData = pickReferralData(userTypeConfig);
+
+  const displayNameMaybe = getDisplayNameMaybe(userTypeConfig, displayName, fname, lname);
 
   const submitParams = {
     email,
@@ -129,8 +142,6 @@ export const getHandleSubmitConfirm = ({
     ...rest
   } = values;
 
-  const displayNameMaybe = displayName ? { displayName: displayName.trim() } : {};
-
   // Pass email, fistName or lastName to Marketplace API only if user has edited them
   // and they can't be fetched directly from idp provider (e.g. Facebook)
   const authParams = {
@@ -142,6 +153,13 @@ export const getHandleSubmitConfirm = ({
   // Set referral to user private data if it exists and is valid
   const userTypeConfig = getUserTypeConfig(userType, userTypes);
   const extraPrivateData = pickReferralData(userTypeConfig);
+
+  const displayNameMaybe = getDisplayNameMaybe(
+    userTypeConfig,
+    displayName,
+    newFirstName,
+    newLastName
+  );
 
   // Pass other values as extended data according to user field configuration
   const extendedDataMaybe = getExtendedDataMaybe(rest, userType, userFields, {

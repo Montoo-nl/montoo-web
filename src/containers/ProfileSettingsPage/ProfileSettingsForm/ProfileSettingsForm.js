@@ -45,10 +45,12 @@ const ACCEPT_IMAGES = 'image/*';
 const UPLOAD_CHANGE_DELAY = 2000; // Show spinner so that browser has time to load img srcset
 
 const DisplayNameMaybe = props => {
-  const { userTypeConfig, intl } = props;
+  const { userTypeConfig, isCompany, intl } = props;
 
   const isDisabled = userTypeConfig?.defaultUserFields?.displayName === false;
-  if (isDisabled) {
+  // Companies don't pick a display name. Theirs is always the default the
+  // Marketplace API builds: first name plus last name initial.
+  if (isDisabled || isCompany) {
     return null;
   }
 
@@ -844,7 +846,7 @@ class ProfileSettingsFormComponent extends Component {
                 </div>
               </div>
 
-              <DisplayNameMaybe userTypeConfig={userTypeConfig} intl={intl} />
+              <DisplayNameMaybe userTypeConfig={userTypeConfig} isCompany={isCompany} intl={intl} />
 
               <div className={classNames(css.sectionContainer)}>
                 <H4 as="h2" className={css.sectionTitle}>

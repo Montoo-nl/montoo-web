@@ -251,6 +251,29 @@ export const showPaymentDetailsForUser = (config, currentUser) => {
 };
 
 /**
+ * Display name built from the first letter of the first and last name, e.g.
+ * 'Jane Doe' -> 'JD'.
+ *
+ * Companies don't get to pick a display name, so theirs is set to this instead
+ * of being left to the Marketplace API's own default ('Jane D').
+ *
+ * @param {string} firstName
+ * @param {string} lastName
+ * @returns {string} the initials, or '' when there is nothing to build them from
+ */
+export const initialsDisplayName = (firstName, lastName) => {
+  const initial = name =>
+    typeof name === 'string'
+      ? name
+          .trim()
+          .charAt(0)
+          .toUpperCase()
+      : '';
+
+  return `${initial(firstName)}${initial(lastName)}`;
+};
+
+/**
  * Check the roles defined for the current user
  * @param {*} config Marketplace configuration
  * @param {*} currentUser API entity

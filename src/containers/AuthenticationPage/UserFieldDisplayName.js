@@ -26,8 +26,11 @@ const UserFieldDisplayName = props => {
   const { displayInSignUp, required } = userTypeConfig?.displayNameSettings || {};
   const isDisabled = userTypeConfig?.defaultUserFields?.displayName === false;
   const isAllowedInSignUp = displayInSignUp === true;
+  // Companies (the 'customer' role) don't pick a display name. Theirs is always
+  // the default the Marketplace API builds: first name plus last name initial.
+  const isCompany = userTypeConfig?.roles?.customer === true;
 
-  if (isDisabled || !isAllowedInSignUp) {
+  if (isDisabled || isCompany || !isAllowedInSignUp) {
     return null;
   }
 
