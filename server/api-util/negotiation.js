@@ -28,6 +28,48 @@ const offerTransitionsInNegotiationProcess = [
   ...revokeCounterOfferTransitions,
 ];
 
+// An offer is on the table while the transaction's last transition is one of
+// these. A rejected or withdrawn offer moves on to another transition, so it
+// stops counting by itself.
+exports.pendingOfferTransitions = makeOfferTransitions;
+
+// Lets the operator take a pending offer off the table, e.g. when the job has
+// gone to someone else.
+exports.OPERATOR_REJECT_OFFER = 'transition/operator-reject-offer';
+
+// Once a payment has been confirmed the job is taken.
+exports.CONFIRM_PAYMENT = 'transition/confirm-payment';
+
+const TRANSACTIONS_PER_PAGE = 100;
+
+/**
+ * Every transaction on a listing, following pagination to the end. A job with
+ * more than a page of transactions is unlikely, but a partial list would
+ * silently miss offers.
+ *
+ * @param {Object} iSdk Integration SDK instance
+ * @param {string} listingId
+ * @returns {Promise<Array>} transaction resources
+ */
+exports.queryAllTransactionsForListing = async (iSdk, listingId) => {
+  let transactions = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const response = await iSdk.transactions.query({
+      listingId,
+      page,
+      perPage: TRANSACTIONS_PER_PAGE,
+    });
+    transactions = [...transactions, ...(response?.data?.data || [])];
+    totalPages = response?.data?.meta?.totalPages || 1;
+    page += 1;
+  } while (page <= totalPages);
+
+  return transactions;
+};
+
 /**
  * @typedef {Object} NegotiationOffer
  * @property {string} transition - The transition name that was triggered to make this offer

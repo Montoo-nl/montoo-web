@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 import { pick } from '../../util/common';
-import { initiatePrivileged, transitionPrivileged } from '../../util/api';
+import { awardJob, initiatePrivileged, transitionPrivileged } from '../../util/api';
 import { denormalisedResponseEntities } from '../../util/data';
 import { storableError } from '../../util/errors';
 import * as log from '../../util/log';
@@ -138,6 +138,17 @@ const confirmPaymentPayloadCreator = (
     .transition(bodyParams, queryParams)
     .then(response => {
       const order = response.data.data;
+
+      // The job is awarded now: close it so it stops taking new offers, and
+      // reject the offers still on the table. Deliberately not awaited and not
+      // allowed to fail the payment - the order went through either way, and
+      // the offer-availability check covers a job that stays open.
+      awardJob({ transactionId: order?.id?.uuid }).catch(e => {
+        log.error(e, 'award-job-after-payment-failed', {
+          transactionId: order?.id?.uuid,
+        });
+      });
+
       return order;
     })
     .catch(e => {

@@ -152,6 +152,23 @@ export const deleteUserAccount = body => {
   return post('/api/delete-account', body);
 };
 
+// Check whether another offer can still be made on a job: at most 3 offers can
+// be pending at a time, and none at all once the job has been paid for.
+//
+// See `server/api/offer-availability.js`. Body: { listingId }.
+// Returns { canMakeOffer, reason, pendingOfferCount, maxOffers, hasConfirmedPayment }.
+export const offerAvailability = body => {
+  return post('/api/offer-availability', body);
+};
+
+// Award a job to the technician whose offer was paid for: close the job so it
+// stops taking new offers, and reject every other offer still on the table.
+//
+// See `server/api/award-job.js`. Body: { transactionId }.
+export const awardJob = body => {
+  return post('/api/award-job', body);
+};
+
 // Ask the backend for presigned URLs that allow uploading files straight
 // from the browser to the marketplace's own file storage.
 //

@@ -1612,5 +1612,7 @@
   "ProfileSettingsForm.portfolioFull": "You can add up to {maxImages} images.",
   "ProfileSettingsForm.portfolioTooLarge": "That image is too large. Maximum size is 5 MB.",
   "ProfileSettingsForm.portfolioInvalidType": "Unsupported file type. Please add a JPG, PNG or WEBP image.",
-  "ProfileSettingsForm.portfolioUploadFailed": "Upload failed. Please try again."
+  "ProfileSettingsForm.portfolioUploadFailed": "Upload failed. Please try again.",
+  "NegotiationForm.offerLimitReached": "This job already has {maxOffers} offers. Try again later — you can apply if one of them is turned down.",
+  "NegotiationForm.jobTaken": "This job has already been awarded, so it isn't taking new offers."
 }

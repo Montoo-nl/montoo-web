@@ -595,6 +595,7 @@ const OrderPanel = props => {
             payoutDetailsWarning={payoutDetailsWarning}
             isOwnListing={isOwnListing}
             missingRequirements={missingJobRequirements}
+            listingId={listing?.id?.uuid}
           />
         ) : showRequestQuoteForm ? (
           <NegotiationRequestQuoteForm

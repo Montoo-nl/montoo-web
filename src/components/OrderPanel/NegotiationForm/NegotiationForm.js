@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Form as FinalForm } from 'react-final-form';
 import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
+import { offerAvailability } from '../../../util/api';
 
 import { Form, PrimaryButton } from '../..';
 import MissingJobRequirements from '../MissingJobRequirements/MissingJobRequirements';
 
 import css from './NegotiationForm.module.css';
+
+// Reasons the backend gives for turning an offer down.
+const JOB_TAKEN = 'jobTaken';
 
 const renderForm = formRenderProps => {
   // FormRenderProps from final-form
@@ -19,6 +23,7 @@ const renderForm = formRenderProps => {
     payoutDetailsWarning,
     isOwnListing,
     missingRequirements,
+    checkInProgress,
     finePrintComponent: FinePrint,
   } = formRenderProps;
   const classes = classNames(rootClassName || css.root, className);
@@ -31,7 +36,11 @@ const renderForm = formRenderProps => {
       <div className={css.submitButton}>
         <MissingJobRequirements missingRequirements={missingRequirements} />
 
-        <PrimaryButton type="submit" disabled={hasMissingRequirements}>
+        <PrimaryButton
+          type="submit"
+          inProgress={checkInProgress}
+          disabled={hasMissingRequirements || checkInProgress}
+        >
           <FormattedMessage id="NegotiationForm.ctaButton" />
         </PrimaryButton>
         <FinePrint
@@ -60,14 +69,59 @@ const renderForm = formRenderProps => {
  * @param {string} props.formId - The ID of the form
  * @param {Object} [props.missingRequirements] - From getMissingJobRequirements. Computed by
  * OrderPanel, so that this form and the mobile CTA button agree on what is blocked.
+ * @param {string} [props.listingId] - Used to check how many offers the job already has
  * @param {Function} props.onSubmit - The function to handle the form submission
  * @returns {JSX.Element}
  */
 const NegotiationForm = props => {
   const intl = useIntl();
+  const { listingId, onSubmit } = props;
   const initialValues = {};
 
-  return <FinalForm initialValues={initialValues} {...props} intl={intl} render={renderForm} />;
+  const [checkInProgress, setCheckInProgress] = useState(false);
+
+  // How many offers a job already has is only known to the backend, so it is
+  // asked on submit rather than on every render of the listing page.
+  const handleSubmit = values => {
+    if (!listingId) {
+      return onSubmit(values);
+    }
+
+    setCheckInProgress(true);
+
+    return offerAvailability({ listingId })
+      .then(response => {
+        setCheckInProgress(false);
+
+        if (response?.canMakeOffer === false) {
+          const messageId =
+            response.reason === JOB_TAKEN
+              ? 'NegotiationForm.jobTaken'
+              : 'NegotiationForm.offerLimitReached';
+          window.alert(intl.formatMessage({ id: messageId }, { maxOffers: response.maxOffers }));
+          return;
+        }
+
+        return onSubmit(values);
+      })
+      .catch(() => {
+        // The transition itself is still guarded by the transaction process, so
+        // a failed check shouldn't be what stops a legitimate offer.
+        setCheckInProgress(false);
+        return onSubmit(values);
+      });
+  };
+
+  return (
+    <FinalForm
+      initialValues={initialValues}
+      {...props}
+      onSubmit={handleSubmit}
+      intl={intl}
+      checkInProgress={checkInProgress}
+      render={renderForm}
+    />
+  );
 };
 
 export default NegotiationForm;
