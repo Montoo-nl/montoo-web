@@ -75,14 +75,21 @@
   font-weight: 600;
   font-style: Semi Bold;
   font-size: 26px;
-  leading-trim: NONE;
+
   line-height: 100%;
   letter-spacing: 0%;
-  text-align: center;
+  text-align: left;
   
   color: #ffffff;
   letter-spacing: 0;
-
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+line-clamp: 1;
+-webkit-line-clamp: 1;
+-webkit-box-orient: vertical;
+display: -webkit-box;
+max-width: 100%;
 
 }
 
