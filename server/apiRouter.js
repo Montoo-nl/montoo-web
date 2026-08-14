@@ -27,6 +27,7 @@ const offerAvailability = require('./api/offer-availability');
 const awardJob = require('./api/award-job');
 const linkExtraPayment = require('./api/link-extra-payment');
 const updateAggregateRating = require('./api/update-aggregate-rating');
+const stripeRouter = require('./api/stripe');
 
 const router = express.Router();
 
@@ -97,5 +98,10 @@ router.post('/offer-availability', middleware.auth, offerAvailability);
 router.post('/award-job', middleware.auth, awardJob);
 
 router.post('/link-extra-payment', middleware.auth, linkExtraPayment);
+
+// Note: this endpoint is not behind middleware.auth - Stripe authenticates
+// itself with a signature instead. It is also exempted from basic auth in
+// server/index.js, for the same reason.
+router.use('/stripe', stripeRouter);
 
 module.exports = router;

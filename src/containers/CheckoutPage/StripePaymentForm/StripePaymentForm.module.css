@@ -96,6 +96,20 @@
   }
 }
 
+.paymentMethodTypeSelect {
+  margin-bottom: 24px;
+}
+
+.idealDetails {
+  margin-bottom: 48px;
+}
+
+.idealInfo {
+  composes: h5 from global;
+  color: var(--colorGrey700);
+  margin: 0 0 12px 0;
+}
+
 .billingDetails {
   margin-bottom: 48px;
 }

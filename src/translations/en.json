@@ -1645,5 +1645,9 @@
   "ExtraPaymentModal.declineButton": "Decline",
   "ExtraPaymentModal.paymentFailed": "The payment didn't go through. Please try again.",
   "ExtraPaymentModal.declineFailed": "Declining the request failed. Please try again.",
-  "ExtraPaymentModal.notPayable": "This request is no longer open."
+  "ExtraPaymentModal.notPayable": "This request is no longer open.",
+  "StripePaymentForm.paymentMethodTypeHeading": "Payment method",
+  "StripePaymentForm.paymentMethodTypeCard": "Card",
+  "StripePaymentForm.paymentMethodTypeIdeal": "iDEAL",
+  "StripePaymentForm.idealInfo": "You will be taken to your own bank to confirm the payment, and brought back here afterwards."
 }

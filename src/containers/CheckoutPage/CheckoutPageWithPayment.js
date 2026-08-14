@@ -33,6 +33,8 @@ import {
   hasTransactionPassedPendingPayment,
   processCheckoutWithPayment,
   setOrderPageInitialValues,
+  PAYMENT_METHOD_TYPE_CARD,
+  PAYMENT_METHOD_TYPE_IDEAL,
 } from './CheckoutPageTransactionHelpers.js';
 import { getErrorMessages } from './ErrorMessages';
 
@@ -101,6 +103,9 @@ const prefixPriceVariantProperties = priceVariant => {
  * @param {Object} shippingDetails shipping address if applicable.
  * @param {Object} optionalPaymentParams (E.g. paymentMethod or setupPaymentMethodForSaving)
  * @param {Object} config app-wide configs. This contains hosted configs too.
+ * @param {Object} transactionFieldProtectedData custom transaction field data
+ * @param {String} customerDefaultMessage message the customer sends along with the order
+ * @param {String} paymentMethodType 'card' or 'ideal'
  * @returns orderParams.
  */
 const getOrderParams = (
@@ -109,7 +114,8 @@ const getOrderParams = (
   optionalPaymentParams,
   config,
   transactionFieldProtectedData,
-  customerDefaultMessage
+  customerDefaultMessage,
+  paymentMethodType
 ) => {
   const quantity = pageData.orderData?.quantity;
   const quantityMaybe = quantity ? { quantity } : {};
@@ -127,6 +133,19 @@ const getOrderParams = (
 
   const customerDefaultMessageMaybe = customerDefaultMessage ? { customerDefaultMessage } : {};
 
+  const isIdeal = paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
+  // stripe-create-payment-intent-push takes the allowed payment method types as
+  // a transition parameter (not as protected data), and it is mandatory.
+  const paymentMethodTypesMaybe = isIdeal
+    ? { paymentMethodTypes: [PAYMENT_METHOD_TYPE_IDEAL] }
+    : {};
+  // The choice is also kept on the transaction, so that coming back to the
+  // checkout - or landing on the order page after the bank redirect - knows
+  // which kind of PaymentIntent is already out there.
+  const resolvedPaymentMethodType = isIdeal
+    ? PAYMENT_METHOD_TYPE_IDEAL
+    : PAYMENT_METHOD_TYPE_CARD;
+
   const protectedDataMaybe = {
     protectedData: {
       ...getTransactionTypeData(listingType, unitType, config),
@@ -135,6 +154,7 @@ const getOrderParams = (
       ...priceVariantMaybe,
       ...transactionFieldProtectedData,
       ...customerDefaultMessageMaybe,
+      paymentMethodType: resolvedPaymentMethodType,
     },
   };
 
@@ -155,6 +175,7 @@ const getOrderParams = (
     ...bookingDatesMaybe(pageData.orderData?.bookingDates),
     ...priceVariantNameMaybe,
     ...protectedDataMaybe,
+    ...paymentMethodTypesMaybe,
     ...optionalPaymentParams,
   };
   return orderParams;
@@ -264,16 +285,27 @@ const handleSubmit = (values, process, props, stripe, submitting, setSubmitting)
     sessionStorageKey,
     transactionFieldConfigs = [],
   } = props;
-  const { card, message, paymentMethod: selectedPaymentMethod, formValues } = values;
+  const {
+    card,
+    message,
+    paymentMethod: selectedPaymentMethod,
+    paymentMethodType,
+    formValues,
+  } = values;
   const { saveAfterOnetimePayment: saveAfterOnetimePaymentRaw } = formValues;
 
   const transactionFieldsProtectedData = {
     ...pickTransactionFieldsData(formValues, 'protected', true, transactionFieldConfigs),
   };
 
+  // iDEAL has no card to reuse or to save for later, so it is always a one-time
+  // payment regardless of what the customer has stored.
+  const isIdeal = paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
   const saveAfterOnetimePayment =
     Array.isArray(saveAfterOnetimePaymentRaw) && saveAfterOnetimePaymentRaw.length > 0;
-  const selectedPaymentFlow = paymentFlow(selectedPaymentMethod, saveAfterOnetimePayment);
+  const selectedPaymentFlow = isIdeal
+    ? ONETIME_PAYMENT
+    : paymentFlow(selectedPaymentMethod, saveAfterOnetimePayment);
   const hasDefaultPaymentMethodSaved = hasDefaultPaymentMethod(stripeCustomerFetched, currentUser);
   const stripePaymentMethodId = hasDefaultPaymentMethodSaved
     ? currentUser?.stripeCustomer?.defaultPaymentMethod?.attributes?.stripePaymentMethodId
@@ -300,6 +332,7 @@ const handleSubmit = (values, process, props, stripe, submitting, setSubmitting)
     onSavePaymentMethod,
     sessionStorageKey,
     stripeCustomer: currentUser?.stripeCustomer,
+    isIdeal,
     isPaymentFlowUseSavedCard: selectedPaymentFlow === USE_SAVED_CARD,
     isPaymentFlowPayAndSaveCard: selectedPaymentFlow === PAY_AND_SAVE_FOR_LATER_USE,
     setPageData,
@@ -324,7 +357,8 @@ const handleSubmit = (values, process, props, stripe, submitting, setSubmitting)
     optionalPaymentParams,
     config,
     transactionFieldsProtectedData,
-    message
+    message,
+    paymentMethodType
   );
 
   // There are multiple XHR calls that needs to be made against Stripe API and Sharetribe Marketplace API on checkout with payments
@@ -538,7 +572,22 @@ export const CheckoutPageWithPayment = props => {
   // If your marketplace works mostly in one country you can use initial values to select country automatically
   // e.g. {country: 'FI'}
 
-  const initialValuesForStripePayment = { name: userName, recipientName: userName };
+  // Only the negotiation process has the push-payment transitions.
+  const showPaymentMethodTypeSelector = isNegotiation;
+
+  // The payment method type is baked into the PaymentIntent when it is created,
+  // on the first payment-related transition, and the two kinds are not
+  // interchangeable: a card intent can't be confirmed as a push payment, or the
+  // other way round. Once the intent exists the choice is locked, so the
+  // selector still shows what was picked but can no longer be changed.
+  const txProtectedData = existingTransaction?.attributes?.protectedData;
+  const hasPaymentIntent = !!txProtectedData?.stripePaymentIntents;
+
+  const initialValuesForStripePayment = {
+    name: userName,
+    recipientName: userName,
+    paymentMethodType: txProtectedData?.paymentMethodType || PAYMENT_METHOD_TYPE_CARD,
+  };
   const askShippingDetails =
     orderData?.deliveryMethod === 'shipping' &&
     !hasTransactionPassedPendingPayment(existingTransaction, process);
@@ -639,6 +688,8 @@ export const CheckoutPageWithPayment = props => {
                   return onStripeInitialized(stripe, process, props);
                 }}
                 askShippingDetails={askShippingDetails}
+                showPaymentMethodTypeSelector={showPaymentMethodTypeSelector}
+                paymentMethodTypeDisabled={hasPaymentIntent}
                 showPickUpLocation={showPickUpLocation}
                 showLocation={showLocation}
                 listingLocation={listingLocation}

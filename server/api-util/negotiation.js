@@ -31,11 +31,13 @@ const offerTransitionsInNegotiationProcess = [
 // An offer is on the table while the transaction's last transition is one of
 // these. A rejected or withdrawn offer moves on to another transition, so it
 // stops counting by itself.
-exports.pendingOfferTransitions = makeOfferTransitions;
+const pendingOfferTransitions = makeOfferTransitions;
+exports.pendingOfferTransitions = pendingOfferTransitions;
 
 // Lets the operator take a pending offer off the table, e.g. when the job has
 // gone to someone else.
-exports.OPERATOR_REJECT_OFFER = 'transition/operator-reject-offer';
+const OPERATOR_REJECT_OFFER = 'transition/operator-reject-offer';
+exports.OPERATOR_REJECT_OFFER = OPERATOR_REJECT_OFFER;
 
 // extra-payment process: the technician names an amount for work that wasn't in
 // the original job. Like a make-offer transition, the amount comes from the
@@ -111,7 +113,7 @@ const TRANSACTIONS_PER_PAGE = 100;
  * @param {string} listingId
  * @returns {Promise<Array>} transaction resources
  */
-exports.queryAllTransactionsForListing = async (iSdk, listingId) => {
+const queryAllTransactionsForListing = async (iSdk, listingId) => {
   let transactions = [];
   let page = 1;
   let totalPages = 1;
@@ -129,6 +131,85 @@ exports.queryAllTransactionsForListing = async (iSdk, listingId) => {
 
   return transactions;
 };
+exports.queryAllTransactionsForListing = queryAllTransactionsForListing;
+
+const LISTING_STATE_CLOSED = 'closed';
+
+/**
+ * Awards a job to the technician whose offer was paid for:
+ *   1. closes the job, so it stops taking new offers
+ *   2. rejects every other offer still on the table
+ *
+ * A job is a listing in Marketplace API terms, which is why this closes a
+ * listing. Rejecting is an operator transition, so it needs the Integration SDK.
+ *
+ * Called once the payment is confirmed - by the client for card payments, and
+ * by the Stripe webhook for push payments, where the customer never comes back
+ * through the client to confirm. It is safe to run more than once for the same
+ * transaction. The offer-availability check is the backstop for the case where
+ * it doesn't run at all.
+ *
+ * @param {Object} iSdk Integration SDK instance
+ * @param {string} transactionId
+ * @returns {Promise<Object>} { listingId, closed, rejectedOffers, failedRejections }.
+ *   listingId is null when the transaction has no listing to award.
+ */
+const awardJobForTransaction = async (iSdk, transactionId) => {
+  const response = await iSdk.transactions.show({
+    id: transactionId,
+    include: ['listing'],
+    'fields.listing': ['state'],
+  });
+
+  const listing = response?.data?.included?.find(entity => entity.type === 'listing');
+  const listingId = listing?.id?.uuid;
+
+  if (!listingId) {
+    return { listingId: null, closed: false, rejectedOffers: 0, failedRejections: 0 };
+  }
+
+  // Closing an already closed listing is an error, and this can be called
+  // more than once for the same transaction.
+  const isAlreadyClosed = listing.attributes?.state === LISTING_STATE_CLOSED;
+  if (!isAlreadyClosed) {
+    await iSdk.listings.close({ id: listingId });
+  }
+
+  // Every other offer still waiting on this job is out of the running now.
+  // The winning transaction has moved past 'offer-pending' by this point, but
+  // it is left out by id as well, so this can't reject the offer it awarded.
+  const transactions = await queryAllTransactionsForListing(iSdk, listingId);
+  const losingOffers = transactions.filter(
+    tx =>
+      tx.id?.uuid !== transactionId &&
+      pendingOfferTransitions.includes(tx.attributes?.lastTransition)
+  );
+
+  // One offer failing to transition shouldn't stop the rest, so they are
+  // settled independently and the failures are reported back.
+  const results = await Promise.allSettled(
+    losingOffers.map(tx =>
+      iSdk.transactions.transition({
+        id: tx.id,
+        transition: OPERATOR_REJECT_OFFER,
+        params: {},
+      })
+    )
+  );
+
+  const failedRejections = results.filter(r => r.status === 'rejected');
+  failedRejections.forEach(r => {
+    console.error('Failed to reject offer after awarding job:', r.reason?.message || r.reason);
+  });
+
+  return {
+    listingId,
+    closed: !isAlreadyClosed,
+    rejectedOffers: results.length - failedRejections.length,
+    failedRejections: failedRejections.length,
+  };
+};
+exports.awardJobForTransaction = awardJobForTransaction;
 
 /**
  * @typedef {Object} NegotiationOffer

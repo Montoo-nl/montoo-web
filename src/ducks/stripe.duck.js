@@ -59,8 +59,9 @@ export const retrievePaymentIntent = params => dispatch => {
 const confirmCardPaymentPayloadCreator = (params, { rejectWithValue }) => {
   // It's required to use the same instance of Stripe as where the card has been created
   // so that's why Stripe needs to be passed here and we can't create a new instance.
-  const { stripe, paymentParams, stripePaymentIntentClientSecret } = params;
+  const { stripe, paymentParams, stripePaymentIntentClientSecret, mode = 'card' } = params;
   const transactionId = params.orderId;
+  const isIdeal = mode === 'ideal';
 
   // When using default payment method paymentParams.payment_method is
   // already set Marketplace API side, when request-payment transition is made
@@ -69,14 +70,22 @@ const confirmCardPaymentPayloadCreator = (params, { rejectWithValue }) => {
     ? [stripePaymentIntentClientSecret, paymentParams]
     : [stripePaymentIntentClientSecret];
 
-  const doConfirmCardPayment = () =>
-    stripe.confirmCardPayment(...args).then(response => {
+  // iDEAL is confirmed in the customer's bank, so Stripe takes over the window
+  // and this promise normally never settles - the flow continues on the page
+  // that return_url points to.
+  const doConfirmCardPayment = () => {
+    const stripeFn = isIdeal
+      ? (...fnArgs) => stripe.confirmIdealPayment(...fnArgs)
+      : (...fnArgs) => stripe.confirmCardPayment(...fnArgs);
+
+    return stripeFn(...args).then(response => {
       if (response.error) {
         return Promise.reject(response);
       } else {
         return { ...response, transactionId };
       }
     });
+  };
 
   // First, check if the payment intent has already been confirmed and it just requires capture.
   return stripe

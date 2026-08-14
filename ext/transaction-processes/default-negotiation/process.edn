@@ -148,7 +148,18 @@
    :from :state/offer-pending,
    :to :state/pending-payment,
    :actor :actor.role/customer,
-   :actions [{:name :action/stripe-create-payment-intent}]}
+   :actions [{:name :action/update-protected-data}
+   {:name :action/stripe-create-payment-intent}]}
+  ;; Same as request-payment-to-accept-offer, but for push payment methods
+  ;; (iDEAL). Those need a PaymentIntent created with the allowed payment
+  ;; method types, which are given as a transition parameter.
+  {:name :transition/request-push-payment-to-accept-offer,
+   :from :state/offer-pending,
+   :to :state/pending-payment,
+   :actor :actor.role/customer,
+   :actions
+   [{:name :action/update-protected-data}
+    {:name :action/stripe-create-payment-intent-push}]}
   {:name :transition/expire-payment,
    :from :state/pending-payment,
    :to :state/payment-expired,
@@ -163,6 +174,16 @@
    :from :state/pending-payment,
    :to :state/offer-accepted,
    :actor :actor.role/customer,
+   :actions
+   [{:name :action/stripe-confirm-payment-intent}
+    {:name :action/stripe-capture-payment-intent}]}
+  ;; Same as confirm-payment, but for push payment methods (iDEAL). The
+  ;; customer pays in their bank and never comes back through the client to
+  ;; confirm, so this is made by the operator from the Stripe webhook.
+  {:name :transition/confirm-push-payment,
+   :from :state/pending-payment,
+   :to :state/offer-accepted,
+   :actor :actor.role/operator,
    :actions
    [{:name :action/stripe-confirm-payment-intent}
     {:name :action/stripe-capture-payment-intent}]}
@@ -408,6 +429,22 @@
    :template :negotiation-accepted-offer}
   {:name :notification/deliver-reminder,
    :on :transition/confirm-payment,
+   :at
+   {:fn/plus
+    [{:fn/timepoint [:time/first-entered-state :state/offer-accepted]}
+     {:fn/period ["P72D"]}]},
+   :to :actor.role/provider,
+   :template :negotiation-deliver-reminder}
+  {:name :notification/order-receipt-push,
+   :on :transition/confirm-push-payment,
+   :to :actor.role/customer,
+   :template :negotiation-order-receipt}
+  {:name :notification/accepted-offer-push,
+   :on :transition/confirm-push-payment,
+   :to :actor.role/provider,
+   :template :negotiation-accepted-offer}
+  {:name :notification/deliver-reminder-push,
+   :on :transition/confirm-push-payment,
    :at
    {:fn/plus
     [{:fn/timepoint [:time/first-entered-state :state/offer-accepted]}

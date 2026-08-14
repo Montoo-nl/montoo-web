@@ -28,7 +28,7 @@ const createStripeAccountPayloadCreator = (params, { extra: sdk, rejectWithValue
   // collected from the providers.
   // You can read more from here: https://stripe.com/docs/connect/capabilities-overview
   // Note: with default processes, both 'card_payments' and 'transfers' are required.
-  const requestedCapabilities = ['card_payments', 'transfers'];
+  const requestedCapabilities = ['card_payments', 'transfers', 'ideal_payments'];
 
   const accountInfo = {
     ...getStripeAccountTokenInfo({ country, accountType }),
@@ -86,7 +86,7 @@ const updateStripeAccountPayloadCreator = (params, { extra: sdk, rejectWithValue
   // See API reference for more information:
   // https://www.sharetribe.com/api-reference/?javascript#update-stripe-account
   return sdk.stripeAccount
-    .update({ requestedCapabilities: ['card_payments', 'transfers'] }, { expand: true })
+    .update({ requestedCapabilities: ['card_payments', 'transfers', 'ideal_payments'] }, { expand: true })
     .then(response => {
       const stripeAccount = response.data.data;
       return stripeAccount;

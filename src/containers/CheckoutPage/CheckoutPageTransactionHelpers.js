@@ -7,6 +7,18 @@ import { NEGOTIATION_PROCESS_NAME, resolveLatestProcessName } from '../../transa
 import { storeData } from './CheckoutPageSessionHelpers';
 
 /**
+ * The payment method types the checkout offers.
+ *
+ * 'card' is the Stripe card element and the pull payment it implies: the charge
+ * is preauthorized first and captured later. 'ideal' is a push payment method -
+ * the customer confirms the payment in their own bank, which captures it in
+ * full right away. That difference is why iDEAL needs its own pair of
+ * transitions in the transaction process.
+ */
+export const PAYMENT_METHOD_TYPE_CARD = 'card';
+export const PAYMENT_METHOD_TYPE_IDEAL = 'ideal';
+
+/**
  * Extract relevant transaction type data from listing type
  * Note: this is saved to protectedData of the transaction entity
  *       therefore, we don't need the process name (nor alias)
@@ -179,6 +191,7 @@ const persistTransaction = (order, pageData, storeData, setPageData, sessionStor
 export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
   const {
     hasPaymentIntentUserActionsDone,
+    isIdeal,
     isPaymentFlowUseSavedCard,
     isPaymentFlowPayAndSaveCard,
     onConfirmCardPayment,
@@ -215,6 +228,8 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
     const requestTransition =
       storedTx?.attributes?.lastTransition === process.transitions.INQUIRE
         ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
+        : isOfferPendingInNegotiationProcess && isIdeal
+        ? process.transitions.REQUEST_PUSH_PAYMENT_TO_ACCEPT_OFFER
         : isOfferPendingInNegotiationProcess
         ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
         : process.transitions.REQUEST_PAYMENT;
@@ -252,11 +267,26 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
       : null;
 
     const { stripe, card, billingDetails, paymentIntent } = extraPaymentParams;
-    const stripeElementMaybe = !isPaymentFlowUseSavedCard ? { card } : {};
+    const stripeElementMaybe = !isIdeal && !isPaymentFlowUseSavedCard ? { card } : {};
+
+    // iDEAL takes the customer to their bank to confirm the payment, and Stripe
+    // brings them back to the order page afterwards. The transaction itself is
+    // moved on by the Stripe webhook, not by anything on this page.
+    const redirectUrl = `${window.location.origin}/order/${order?.id?.uuid}`;
 
     // Note: For basic USE_SAVED_CARD scenario, we have set it already on API side, when PaymentIntent was created.
     // However, the payment_method is save here for USE_SAVED_CARD flow if customer first attempted onetime payment
-    const paymentParams = !isPaymentFlowUseSavedCard
+    const paymentParams = isIdeal
+      ? {
+          payment_method: {
+            billing_details: billingDetails,
+            // An empty ideal object lets the customer pick their bank on
+            // Stripe's own page instead of us rendering a bank selector.
+            ideal: {},
+          },
+          return_url: redirectUrl,
+        }
+      : !isPaymentFlowUseSavedCard
       ? {
           payment_method: {
             billing_details: billingDetails,
@@ -271,6 +301,7 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
       stripe,
       ...stripeElementMaybe,
       paymentParams,
+      mode: isIdeal ? PAYMENT_METHOD_TYPE_IDEAL : PAYMENT_METHOD_TYPE_CARD,
     };
 
     return hasPaymentIntentUserActionsDone
@@ -287,6 +318,15 @@ export const processCheckoutWithPayment = (orderParams, extraPaymentParams) => {
     // Remember the created PaymentIntent for step 5
     createdPaymentIntent = fnParams.paymentIntent;
     const transactionId = fnParams.transactionId;
+
+    // confirm-push-payment is an operator transition, made from the Stripe
+    // webhook once the customer has paid in their bank. There is nothing for
+    // the customer to do here - and on the usual path the browser has already
+    // left for the bank before this step is ever reached.
+    if (isIdeal) {
+      return Promise.resolve({ id: transactionId });
+    }
+
     const transitionName = process.transitions.CONFIRM_PAYMENT;
     const isTransitionedAlready = storedTx?.attributes?.lastTransition === transitionName;
     const orderPromise = isTransitionedAlready

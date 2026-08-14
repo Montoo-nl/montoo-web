@@ -20,6 +20,7 @@ import {
   Form,
   PrimaryButton,
   FieldCheckbox,
+  FieldSelect,
   FieldTextInput,
   IconSpinner,
   SavedCardDetails,
@@ -27,6 +28,10 @@ import {
   CustomExtendedDataField,
 } from '../../../components';
 
+import {
+  PAYMENT_METHOD_TYPE_CARD,
+  PAYMENT_METHOD_TYPE_IDEAL,
+} from '../CheckoutPageTransactionHelpers';
 import ShippingDetails from '../ShippingDetails/ShippingDetails';
 
 import css from './StripePaymentForm.module.css';
@@ -188,13 +193,77 @@ const getPaymentMethod = (selectedPaymentMethod, hasDefaultPaymentMethod) => {
     : selectedPaymentMethod;
 };
 
+/**
+ * The dropdown that picks between paying by card and paying with iDEAL.
+ * Only rendered when the transaction process has the push-payment transitions
+ * and no PaymentIntent has been created yet.
+ */
+const PaymentMethodTypeSelector = props => {
+  const { formId, onChange, disabled, intl } = props;
+  return (
+    <React.Fragment>
+      <Heading as="h3" rootClassName={css.heading}>
+        <FormattedMessage id="StripePaymentForm.paymentMethodTypeHeading" />
+      </Heading>
+      <FieldSelect
+        className={css.paymentMethodTypeSelect}
+        id={`${formId}-paymentMethodType`}
+        name="paymentMethodType"
+        onChange={onChange}
+        disabled={disabled}
+      >
+        <option value={PAYMENT_METHOD_TYPE_CARD}>
+          {intl.formatMessage({ id: 'StripePaymentForm.paymentMethodTypeCard' })}
+        </option>
+        <option value={PAYMENT_METHOD_TYPE_IDEAL}>
+          {intl.formatMessage({ id: 'StripePaymentForm.paymentMethodTypeIdeal' })}
+        </option>
+      </FieldSelect>
+    </React.Fragment>
+  );
+};
+
+/**
+ * iDEAL collects the card-equivalent details at the customer's own bank, so the
+ * only thing we ask for here is the name that goes on the payment.
+ */
+const IdealPaymentDetails = props => {
+  const { nameLabel, namePlaceholder } = props;
+  return (
+    <div className={css.idealDetails}>
+      <Heading as="h3" rootClassName={css.heading}>
+        <FormattedMessage id="StripePaymentForm.billingDetails" />
+      </Heading>
+      <p className={css.idealInfo}>
+        <FormattedMessage id="StripePaymentForm.idealInfo" />
+      </p>
+      <FieldTextInput
+        className={css.field}
+        type="text"
+        id="name"
+        name="name"
+        autoComplete="name"
+        label={nameLabel}
+        placeholder={namePlaceholder}
+      />
+    </div>
+  );
+};
+
 // Should we show onetime payment fields and does StripeElements card need attention
 const checkOnetimePaymentFields = (
   cardValueValid,
   selectedPaymentMethod,
   hasDefaultPaymentMethod,
-  hasHandledCardPayment
+  hasHandledCardPayment,
+  isIdeal
 ) => {
+  if (isIdeal) {
+    // There is no card element to fill in or validate: the customer confirms
+    // the payment in their bank after leaving this page.
+    return { onetimePaymentNeedsAttention: false, showOnetimePaymentFields: false };
+  }
+
   const useDefaultPaymentMethod =
     selectedPaymentMethod === 'defaultCard' && hasDefaultPaymentMethod;
   // Billing details are known if we have already handled card payment or existing default payment method is used.
@@ -285,6 +354,8 @@ const initialState = {
  * @param {boolean} props.hasHandledCardPayment - Whether the card payment has been handled
  * @param {Object} props.defaultPaymentMethod - The default payment method
  * @param {boolean} props.askShippingDetails - Whether to ask for shipping details
+ * @param {boolean} props.showPaymentMethodTypeSelector - Whether the customer can choose between paying by card and paying with iDEAL
+ * @param {boolean} props.paymentMethodTypeDisabled - Whether that choice is locked, because the PaymentIntent already exists
  * @param {boolean} props.showPickUpLocation - Whether to show the pickup location
  * @param {boolean} props.showLocation - Whether to show the location address
  * @param {string} props.totalPrice - The total price
@@ -309,6 +380,7 @@ class StripePaymentForm extends Component {
     this.initializeStripeElement = this.initializeStripeElement.bind(this);
     this.handleStripeElementRef = this.handleStripeElementRef.bind(this);
     this.changePaymentMethod = this.changePaymentMethod.bind(this);
+    this.changePaymentMethodType = this.changePaymentMethodType.bind(this);
     this.handleStripeJsLoadedEvent = this.handleStripeJsLoadedEvent.bind(this);
     this.finalFormAPI = null;
     this.cardContainer = null;
@@ -359,11 +431,18 @@ class StripePaymentForm extends Component {
   }
 
   initializeStripeElement(element) {
+    const container = element || this.cardContainer;
+    if (!container) {
+      // There is nothing to mount into - the card fields are off the page,
+      // e.g. because iDEAL is the selected payment method.
+      return;
+    }
+
     const elements = this.stripe.elements(stripeElementsOptions);
 
     if (!this.card) {
       this.card = elements.create('card', { style: cardStyles });
-      this.card.mount(element || this.cardContainer);
+      this.card.mount(container);
       this.card.addEventListener('change', this.handleCardValueChange);
       // EventListener is the only way to simulate breakpoints with Stripe.
       window.addEventListener('resize', () => {
@@ -408,6 +487,19 @@ class StripePaymentForm extends Component {
     }
   }
 
+  changePaymentMethodType(changedTo) {
+    // The card element is mounted outside of React's tree, so it has to be torn
+    // down by hand before its container is taken off the page. Switching back
+    // remounts it through handleStripeElementRef.
+    if (changedTo !== PAYMENT_METHOD_TYPE_CARD && this.card) {
+      this.card.removeEventListener('change', this.handleCardValueChange);
+      this.card.unmount();
+      this.card = null;
+      this.cardContainer = null;
+      this.setState({ cardValueValid: false, error: null });
+    }
+  }
+
   handleStripeElementRef(el) {
     this.cardContainer = el;
     if (this.stripe && el) {
@@ -441,13 +533,16 @@ class StripePaymentForm extends Component {
     } = this.props;
     const { initialMessage } = values;
     const { cardValueValid, paymentMethod } = this.state;
+    const paymentMethodType = values.paymentMethodType || PAYMENT_METHOD_TYPE_CARD;
+    const isIdeal = paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
     const hasDefaultPaymentMethod = defaultPaymentMethod?.id;
     const selectedPaymentMethod = getPaymentMethod(paymentMethod, hasDefaultPaymentMethod);
     const { onetimePaymentNeedsAttention } = checkOnetimePaymentFields(
       cardValueValid,
       selectedPaymentMethod,
       hasDefaultPaymentMethod,
-      hasHandledCardPayment
+      hasHandledCardPayment,
+      isIdeal
     );
 
     if (inProgress || onetimePaymentNeedsAttention) {
@@ -464,6 +559,7 @@ class StripePaymentForm extends Component {
         paymentMethod,
         ensurePaymentMethodCard(defaultPaymentMethod).id
       ),
+      paymentMethodType,
     };
     onSubmit(params);
   }
@@ -488,6 +584,8 @@ class StripePaymentForm extends Component {
       defaultPaymentMethod,
       listingLocation,
       askShippingDetails,
+      showPaymentMethodTypeSelector,
+      paymentMethodTypeDisabled,
       showLocation,
       showPickUpLocation,
       totalPrice,
@@ -512,13 +610,15 @@ class StripePaymentForm extends Component {
     const billingDetailsNeeded = !(hasHandledCardPayment || confirmPaymentError);
 
     const { cardValueValid, paymentMethod } = this.state;
+    const isIdeal = values?.paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
     const hasDefaultPaymentMethod = ensuredDefaultPaymentMethod.id;
     const selectedPaymentMethod = getPaymentMethod(paymentMethod, hasDefaultPaymentMethod);
     const { onetimePaymentNeedsAttention, showOnetimePaymentFields } = checkOnetimePaymentFields(
       cardValueValid,
       selectedPaymentMethod,
       hasDefaultPaymentMethod,
-      hasHandledCardPayment
+      hasHandledCardPayment,
+      isIdeal
     );
 
     const submitDisabled = invalid || onetimePaymentNeedsAttention || submitInProgress;
@@ -610,7 +710,21 @@ class StripePaymentForm extends Component {
 
         {billingDetailsNeeded && !loadingData ? (
           <React.Fragment>
-            {hasDefaultPaymentMethod ? (
+            {showPaymentMethodTypeSelector ? (
+              <PaymentMethodTypeSelector
+                formId={formId}
+                onChange={this.changePaymentMethodType}
+                disabled={paymentMethodTypeDisabled}
+                intl={intl}
+              />
+            ) : null}
+
+            {isIdeal ? (
+              <IdealPaymentDetails
+                nameLabel={billingDetailsNameLabel}
+                namePlaceholder={billingDetailsNamePlaceholder}
+              />
+            ) : hasDefaultPaymentMethod ? (
               <PaymentMethodSelector
                 cardClasses={cardClasses}
                 formId={formId}

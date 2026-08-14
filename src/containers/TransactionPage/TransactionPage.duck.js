@@ -1358,11 +1358,17 @@ const isNonEmpty = value => {
 
 // loadData is a collection of async calls that need to be made
 // before page has all the info it needs to render itself
-export const loadData = (params, search, config) => (dispatch, getState) => {
+export const loadData = (params, search, config) => async (dispatch, getState) => {
   const txId = new UUID(params.id);
   const state = getState().TransactionPage;
   const txRef = state.transactionRef;
   const txRole = params.transactionRole;
+
+  const isPushRedirect = search?.includes('payment_intent');
+
+  if (isPushRedirect) {
+    await delay(3000);
+  }
 
   // In case a transaction reference is found from a previous
   // data load -> clear the state. Otherwise keep the non-null

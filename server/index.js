@@ -115,6 +115,14 @@ if (cspEnabled) {
   app.use(
     bodyParser.json({
       type: ['json', 'application/csp-report'],
+      verify: (req, res, buf) => {
+        // Store raw body for Stripe webhook endpoints. Verifying a webhook
+        // signature needs the body exactly as Stripe sent it, and this parser
+        // would otherwise be the only thing that ever reads the stream.
+        if (req.originalUrl.startsWith('/api/stripe/webhooks')) {
+          req.rawBody = buf;
+        }
+      },
     })
   );
 
@@ -214,7 +222,16 @@ if (!dev) {
 
   // If BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD have been set - let's use them
   if (hasUsername && hasPassword) {
-    app.use(auth.basicAuth(USERNAME, PASSWORD));
+    const basicAuth = auth.basicAuth(USERNAME, PASSWORD);
+
+    // Stripe has no way to answer a basic auth challenge, so its webhook
+    // endpoint bypasses it - same reasoning as /.well-known above. The request
+    // is still authenticated, by the signature check in the webhook handler.
+    app.use((req, res, next) => {
+      return req.path.startsWith('/api/stripe/webhooks')
+        ? next()
+        : basicAuth(req, res, next);
+    });
   }
 }
 

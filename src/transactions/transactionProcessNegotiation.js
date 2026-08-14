@@ -70,6 +70,12 @@ export const transitions = {
   EXPIRE_PAYMENT: 'transition/expire-payment',
   CONFIRM_PAYMENT: 'transition/confirm-payment',
 
+  // Push payment methods (iDEAL) need their own pair of transitions:
+  // the PaymentIntent is created with the allowed payment method types, and it
+  // is captured in full on confirmation, so there is nothing left to capture.
+  REQUEST_PUSH_PAYMENT_TO_ACCEPT_OFFER: 'transition/request-push-payment-to-accept-offer',
+  CONFIRM_PUSH_PAYMENT: 'transition/confirm-push-payment',
+
   AUTO_CANCEL: 'transition/auto-cancel',
   OPERATOR_CANCEL: 'transition/operator-cancel',
 
@@ -182,6 +188,7 @@ export const graph = {
         [transitions.PROVIDER_WITHDRAW_OFFER]: states.OFFER_REJECTED,
         [transitions.CUSTOMER_MAKE_COUNTER_OFFER]: states.CUSTOMER_OFFER_PENDING,
         [transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER]: states.PENDING_PAYMENT,
+        [transitions.REQUEST_PUSH_PAYMENT_TO_ACCEPT_OFFER]: states.PENDING_PAYMENT,
         [transitions.UPDATE_OFFER]: states.UPDATE_PENDING,
       },
     },
@@ -210,6 +217,7 @@ export const graph = {
     [states.PENDING_PAYMENT]: {
       on: {
         [transitions.CONFIRM_PAYMENT]: states.OFFER_ACCEPTED,
+        [transitions.CONFIRM_PUSH_PAYMENT]: states.OFFER_ACCEPTED,
         [transitions.EXPIRE_PAYMENT]: states.PAYMENT_EXPIRED,
       },
     },
@@ -425,6 +433,7 @@ export const isRelevantPastTransition = transition => {
     transitions.PROVIDER_REJECT_COUNTER_OFFER,
     transitions.EXPIRE_PAYMENT,
     transitions.CONFIRM_PAYMENT,
+    transitions.CONFIRM_PUSH_PAYMENT,
     transitions.AUTO_CANCEL,
     transitions.OPERATOR_CANCEL,
     transitions.DELIVER,
