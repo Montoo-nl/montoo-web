@@ -14,13 +14,20 @@ import {
   isFieldForListingType,
   isValidCurrencyForTransactionProcess,
 } from '../../../../util/fieldHelpers';
-import { maxLength, required, composeValidators } from '../../../../util/validators';
+import {
+  autocompletePlaceSelected,
+  autocompleteSearchRequired,
+  maxLength,
+  required,
+  composeValidators,
+} from '../../../../util/validators';
 
 // Import shared components
 import {
   Form,
   Button,
   FieldCurrencyInput,
+  FieldLocationAutocompleteInput,
   FieldSelect,
   FieldTextInput,
   Heading,
@@ -30,6 +37,10 @@ import {
 import css from './EditListingDetailsForm.module.css';
 
 const TITLE_MAX_LENGTH = 60;
+
+// The location field's value is an object, so it is passed through untouched
+// rather than being formatted as a string.
+const identity = v => v;
 
 // Show various error messages
 const ErrorMessage = props => {
@@ -452,6 +463,37 @@ const EditListingDetailsForm = props => (
                 intl.formatMessage({
                   id: 'EditListingDetailsForm.descriptionRequired',
                 })
+              )}
+            />
+          )}
+
+          {showListingFields && isCompatibleCurrency && (
+            <FieldLocationAutocompleteInput
+              rootClassName={css.jobLocation}
+              inputClassName={css.jobLocationInput}
+              iconClassName={css.jobLocationIcon}
+              predictionsClassName={css.jobLocationPredictions}
+              name="location"
+              id={`${formId}.location`}
+              label={intl.formatMessage({ id: 'EditListingDetailsForm.jobLocationLabel' })}
+              placeholder={intl.formatMessage({
+                id: 'EditListingDetailsForm.jobLocationPlaceholder',
+              })}
+              useDefaultPredictions={false}
+              // The field holds an object, so Final Form's default string
+              // formatting has to be turned off.
+              format={identity}
+              valueFromForm={values.location}
+              // It has to be picked from the predictions, not just typed: only
+              // then does it come with the coordinates that get saved as the
+              // listing's geolocation.
+              validate={composeValidators(
+                autocompleteSearchRequired(
+                  intl.formatMessage({ id: 'EditListingDetailsForm.jobLocationRequired' })
+                ),
+                autocompletePlaceSelected(
+                  intl.formatMessage({ id: 'EditListingDetailsForm.jobLocationNotRecognized' })
+                )
               )}
             />
           )}

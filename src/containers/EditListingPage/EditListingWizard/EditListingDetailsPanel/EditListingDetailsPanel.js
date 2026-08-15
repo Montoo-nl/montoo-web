@@ -240,7 +240,15 @@ const getInitialValues = (
   listingCategories,
   categoryKey
 ) => {
-  const { description, title, publicData, privateData } = props?.listing?.attributes || {};
+  const { description, title, geolocation, publicData, privateData } =
+    props?.listing?.attributes || {};
+
+  // The job's location. Stored the same way the dedicated location panel stores
+  // it: the coordinates as the listing's own geolocation attribute, the written
+  // address in publicData.location. Both have to be there for the field to be
+  // able to show it again.
+  const { address, building } = publicData?.location || {};
+  const locationFieldsPresent = address && geolocation;
   // If details panel is accessed via URL like my.domain.com/l/draft/00000000-0000-0000-0000-000000000000/new/details?listingType=sell-bicycles,
   // we'll pick the preselected listing type from the URL.
   const preselectedListingType = props.locationSearch?.listingType;
@@ -254,6 +262,9 @@ const getInitialValues = (
     title,
     description,
     compensation: moneyFromExtendedData(publicData?.compensation),
+    location: locationFieldsPresent
+      ? { search: address, selectedPlace: { address, origin: geolocation } }
+      : null,
     ...nestedCategories,
     // Transaction type info: listingType, transactionProcessAlias, unitType
     ...getTransactionInfo({ listingTypes, existingListingTypeInfo, preselectedListingType }),
@@ -315,6 +326,9 @@ const EditListingDetailsPanel = props => {
 
   const classes = classNames(rootClassName || css.root, className);
   const { publicData, state } = listing?.attributes || {};
+  // This form doesn't ask for the building, so whatever was saved before is
+  // carried over rather than dropped on the next save.
+  const { building } = publicData?.location || {};
   const listingTypes = config.listing.listingTypes;
   const listingFields = config.listing.listingFields;
   const listingCategories = config.categoryConfiguration.categories;
@@ -395,8 +409,16 @@ const EditListingDetailsPanel = props => {
               transactionProcessAlias,
               unitType,
               compensation,
+              location,
               ...rest
             } = values;
+
+            // Split the picked place the way the listing entity stores it: the
+            // coordinates are a top-level attribute, the address is public data.
+            // `building` is kept from what was saved before - this form doesn't
+            // ask for it, and leaving it out would wipe it.
+            const { address, origin } = location?.selectedPlace || {};
+            const locationMaybe = address && origin ? { address, building } : null;
 
             const nestedCategories = pickCategoryFields(rest, categoryKey, 1, listingCategories);
             // Remove old categories by explicitly saving null for them.
@@ -422,11 +444,13 @@ const EditListingDetailsPanel = props => {
             const updateValues = {
               title: title.trim(),
               description,
+              ...(origin ? { geolocation: origin } : {}),
               publicData: {
                 listingType,
                 transactionProcessAlias,
                 unitType,
                 compensation: moneyToExtendedData(compensation),
+                ...(locationMaybe ? { location: locationMaybe } : {}),
                 ...cleanedNestedCategories,
                 ...publicListingFields,
               },

@@ -341,9 +341,6 @@
   color: var(--colorGrey600);
 }
 
-.companyVan {
-  max-width: 320px;
-}
 
 .companyField {
   margin-bottom: 24px;
@@ -399,6 +396,39 @@
   line-height: 18px;
   margin: 0;
   color: var(--colorFail);
+}
+
+/* Base location autocomplete. The predictions list is absolutely positioned,
+   so the field needs to be the positioned ancestor. */
+.baseLocation {
+  position: relative;
+}
+
+.baseLocationInput {
+}
+
+.baseLocationIcon {
+  display: none;
+}
+
+.baseLocationPredictions {
+  position: absolute;
+  width: 100%;
+  top: 60px;
+  left: 0;
+  background-color: var(--marketplaceColor);
+  border-bottom-left-radius: var(--borderRadius);
+  border-bottom-right-radius: var(--borderRadius);
+  box-shadow: var(--boxShadowPopup);
+
+  /* Above the page, below the sticky topbar. The listing version of this field
+     sits at --zIndexPopup, which on a page with a sticky topbar means the
+     predictions scroll up over it. */
+  z-index: calc(var(--zIndexTopbar) - 1);
+
+  @media (--viewportMedium) {
+    top: 64px;
+  }
 }
 
 .submitButton {

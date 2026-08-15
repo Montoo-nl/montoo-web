@@ -3,7 +3,7 @@ import classNames from 'classnames';
 
 import { useIntl } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
-import { formatMoney } from '../../../util/currency';
+import { formatMoney, moneyFromExtendedData } from '../../../util/currency';
 import { ensureListing } from '../../../util/data';
 import { isPriceVariationsEnabled, requireListingImage } from '../../../util/configHelpers';
 
@@ -17,11 +17,16 @@ const ListingCard = props => {
 
   const { title, price, publicData } = listing.attributes;
   const { cardStyle } = publicData || {};
+
+  // A job's amount is the compensation the company offers, saved to publicData.
+  // The listing's own price is the fallback, for anything created before
+  // compensation existed - same as the listing card does.
+  const displayedPrice = moneyFromExtendedData(publicData?.compensation) || price;
   const formattedPrice =
-    price && price.currency === config.currency
-      ? formatMoney(intl, price)
-      : price?.currency
-      ? price.currency
+    displayedPrice && displayedPrice.currency === config.currency
+      ? formatMoney(intl, displayedPrice)
+      : displayedPrice?.currency
+      ? displayedPrice.currency
       : null;
   const firstImage = listing.images && listing.images.length > 0 ? listing.images[0] : null;
 

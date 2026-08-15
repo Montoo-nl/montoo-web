@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Field } from 'react-final-form';
 import classNames from 'classnames';
 
-import { FormattedMessage } from '../../../util/reactIntl';
+import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import {
   ACCEPTED_IMAGE_MIME_TYPES,
   ACCEPTED_IMAGE_TYPES,
@@ -22,6 +22,23 @@ export const MAX_PORTFOLIO_IMAGES = 10;
 // Raised when more files are picked than there is room left for.
 const TOO_MANY_IMAGES_ERROR = 'tooManyImages';
 
+const hasText = value => !!value?.trim();
+
+/**
+ * Every image has to say what the work was and where it was done - the profile
+ * shows both under the photo, and a caption-less tile tells a company nothing.
+ *
+ * Validates the whole array in one go, because the caption and city live on the
+ * image descriptors rather than being fields of their own.
+ *
+ * @param {string} message shown when any image is missing either
+ * @returns {Function} a Final Form field validator
+ */
+export const portfolioDetailsRequired = message => value =>
+  (value || []).some(image => !hasText(image?.title) || !hasText(image?.city))
+    ? message
+    : undefined;
+
 const ErrorMessage = props => {
   const { error } = props;
 
@@ -40,8 +57,13 @@ const ErrorMessage = props => {
 };
 
 const PortfolioFieldComponent = props => {
-  const { id, storagePath, disabled, onUploadStateChange, input } = props;
+  const { id, storagePath, disabled, onUploadStateChange, input, meta } = props;
   const { name, value, onChange, onBlur } = input;
+  const intl = useIntl();
+
+  // Hold the missing-details message back until the technician has actually
+  // been near the field, so a fresh upload isn't red before they can type.
+  const showDetailErrors = !!(meta?.touched || meta?.submitFailed);
 
   // Images that have finished uploading. Anything still on its way lives in
   // `pending` until its URL is known.
@@ -116,6 +138,16 @@ const PortfolioFieldComponent = props => {
     onBlur();
   };
 
+  // The caption and city are stored on the image descriptor itself, so that the
+  // profile page can show what each photo is without a second lookup.
+  const handleDetailChange = (imageKey, field, fieldValue) => {
+    onChange(
+      imagesRef.current.map(image =>
+        image.key === imageKey ? { ...image, [field]: fieldValue } : image
+      )
+    );
+  };
+
   const isFull = images.length + pending.length >= MAX_PORTFOLIO_IMAGES;
 
   return (
@@ -123,18 +155,54 @@ const PortfolioFieldComponent = props => {
       <ul className={css.grid}>
         {images.map(image => (
           <li key={image.key} className={css.item}>
-            <img className={css.image} src={image.url} alt={image.name} />
-            <button
-              className={css.removeButton}
-              type="button"
-              disabled={disabled}
-              onClick={() => handleRemove(image.key)}
-            >
-              <FormattedMessage
-                id="ProfileSettingsForm.portfolioRemove"
-                values={{ fileName: image.name }}
+            <div className={css.imageWrapper}>
+              <img className={css.image} src={image.url} alt={image.title || image.name} />
+              <button
+                className={css.removeButton}
+                type="button"
+                disabled={disabled}
+                onClick={() => handleRemove(image.key)}
+              >
+                <FormattedMessage
+                  id="ProfileSettingsForm.portfolioRemove"
+                  values={{ fileName: image.name }}
+                />
+              </button>
+            </div>
+
+            {/* Plain inputs rather than form fields of their own: these belong
+                to the image descriptor, so they are edited in the array this
+                field already owns. */}
+            <div className={css.details}>
+              <input
+                className={classNames(css.detailInput, {
+                  [css.detailInputError]: showDetailErrors && !hasText(image.title),
+                })}
+                type="text"
+                value={image.title || ''}
+                disabled={disabled}
+                placeholder={intl.formatMessage({
+                  id: 'ProfileSettingsForm.portfolioTitlePlaceholder',
+                })}
+                aria-label={intl.formatMessage({ id: 'ProfileSettingsForm.portfolioTitleLabel' })}
+                onChange={e => handleDetailChange(image.key, 'title', e.target.value)}
+                onBlur={onBlur}
               />
-            </button>
+              <input
+                className={classNames(css.detailInput, {
+                  [css.detailInputError]: showDetailErrors && !hasText(image.city),
+                })}
+                type="text"
+                value={image.city || ''}
+                disabled={disabled}
+                placeholder={intl.formatMessage({
+                  id: 'ProfileSettingsForm.portfolioCityPlaceholder',
+                })}
+                aria-label={intl.formatMessage({ id: 'ProfileSettingsForm.portfolioCityLabel' })}
+                onChange={e => handleDetailChange(image.key, 'city', e.target.value)}
+                onBlur={onBlur}
+              />
+            </div>
           </li>
         ))}
 
@@ -171,6 +239,8 @@ const PortfolioFieldComponent = props => {
           />
         </span>
       </div>
+
+      {showDetailErrors && meta?.error ? <p className={css.error}>{meta.error}</p> : null}
 
       {errors.map((error, index) => (
         <p key={`${error}_${index}`} className={css.error}>

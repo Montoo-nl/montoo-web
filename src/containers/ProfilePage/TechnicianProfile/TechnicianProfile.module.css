@@ -1,0 +1,515 @@
+@import '../../../styles/customMediaQueries.css';
+
+/* The card design is a departure from ProfilePage.module.css, which has no
+   surfaces, radii or shadows. Kept in its own module so the company profile
+   can't be affected. */
+.contentWrapper {
+  /* Only two radii exist as tokens (2px, 4px) and neither suits a card, so the
+     values this design needs are named once here. */
+  --technicianCardRadius: 12px;
+  --technicianChipRadius: 999px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 24px 56px 24px;
+
+  @media (--viewportMedium) {
+    width: 100%;
+    max-width: var(--contentMaxWidth);
+    margin: 0 auto;
+  }
+
+  @media (--viewportLarge) {
+    max-width: unset;
+    width: min(calc(var(--contentMaxWidth) + 72px), 100vw);
+    gap: 24px;
+    padding: 48px 36px 96px 36px;
+    margin: 0 auto;
+  }
+}
+
+.error {
+  color: var(--colorFail);
+}
+
+.longWord {
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* ================ Shared card surface ================ */
+
+.headerCard,
+.band > *,
+.portfolio,
+.reviewsSection {
+  background-color: var(--colorWhite);
+  border: 1px solid var(--colorGrey100);
+  border-radius: var(--technicianCardRadius);
+  box-shadow: var(--boxShadowLight);
+  padding: 24px;
+}
+
+.sectionTitle {
+  composes: h4 from global;
+  margin: 0;
+}
+
+
+/* ================ Header card ================ */
+
+.headerCard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  @media (--viewportLarge) {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+  }
+}
+
+.headerIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 auto;
+
+  @media (--viewportSmall) {
+    flex-direction: row;
+    gap: 24px;
+  }
+}
+
+.avatarWrapper {
+  position: relative;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+
+  @media (--viewportLarge) {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+}
+
+/* AvatarLarge renders no children, so the badge is a positioned sibling.
+   Carries the marketplace colour: being verified is a mark from the
+   marketplace, not a status of the technician's own. */
+.verifiedBadge {
+  composes: textXSmall from global;
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--technicianChipRadius);
+  background-color: var(--marketplaceColor);
+  color: var(--colorWhite);
+  font-weight: var(--fontWeightSemiBold);
+  white-space: nowrap;
+  margin: 0;
+  box-shadow: var(--boxShadowLight);
+}
+
+.verifiedBadgeIcon {
+  color: var(--colorWhite);
+  flex-shrink: 0;
+}
+
+.headerDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.name {
+  margin: 0;
+}
+
+.availability {
+  composes: textSmall from global;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--colorSuccessLight);
+  margin: 0;
+}
+
+.availabilityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--colorSuccessLight);
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 8px;
+}
+
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* rootClassName replaces IconReviewStar's own fill, className would only append. */
+.ratingStar {
+  fill: var(--colorAttention);
+  width: 16px;
+  height: 16px;
+}
+
+.ratingValue {
+  font-weight: var(--fontWeightBold);
+}
+
+.ratingCount,
+.memberSince {
+  composes: textSmall from global;
+  color: var(--colorGrey700);
+  margin: 0;
+}
+
+.bio {
+  composes: textSmall from global;
+  color: var(--colorGrey700);
+  margin: 12px 0 0 0;
+}
+
+.editLink {
+  composes: textSmall from global;
+  color: var(--marketplaceColor);
+  margin-top: 12px;
+}
+
+/* ---- Work area / base location panel ---- */
+
+.locationPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--technicianCardRadius);
+  background-color: var(--colorGrey50);
+
+  @media (--viewportLarge) {
+    flex: 0 0 300px;
+  }
+}
+
+.locationRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.locationIcon {
+  color: var(--marketplaceColor);
+  flex-shrink: 0;
+  margin-top: 2px;
+  line-height: 0;
+}
+
+.locationLabel {
+  composes: textSmall from global;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 0;
+}
+
+.locationValue {
+  composes: textXSmall from global;
+  color: var(--colorGrey700);
+  margin: 2px 0 0 0;
+}
+
+/* ================ Three-column band ================ */
+
+.band {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+
+  @media (--viewportMedium) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (--viewportLarge) {
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+.bandColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Skills needs the room, so it spans the pair at medium widths. */
+.bandColumnSkills {
+  composes: bandColumn;
+
+  @media (--viewportMedium) {
+    grid-column: 1 / -1;
+  }
+
+  @media (--viewportLarge) {
+    grid-column: auto;
+  }
+}
+
+.bandHeading {
+  composes: textSmall from global;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: var(--fontWeightSemiBold);
+  color: var(--marketplaceColor);
+  margin: 0 0 16px 0;
+}
+
+.bandHeadingIcon {
+  flex-shrink: 0;
+}
+
+/* One skill per row. Stacking them reads as a list of what the technician does
+   rather than a cloud of tags, and it fills the tall column the band gives it. */
+.chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chip {
+  composes: textSmall from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: var(--technicianChipRadius);
+  border: 1px solid var(--colorGrey100);
+  background-color: var(--colorGrey50);
+  color: var(--colorGrey700);
+  margin: 0;
+
+  @media (--viewportLarge) {
+    /* Hug the text once there is a column to sit in, so the pills keep their
+       shape instead of stretching to the card edge. */
+    width: auto;
+    max-width: 100%;
+  }
+}
+
+.chipTick {
+  color: var(--colorSuccessLight);
+  flex-shrink: 0;
+}
+
+/* The number is all that is left in this column, so it sits in the middle of
+   whatever height the band's tallest card sets. */
+.experienceBody {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.experienceValue {
+  composes: h1 from global;
+  margin: 0;
+}
+
+.experienceUnit {
+  composes: textSmall from global;
+  color: var(--colorGrey700);
+  margin: 0;
+}
+
+.transportList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The check sits on the right, which PropertyGroup can't do - so the list is
+   written here rather than bending the shared component. */
+.transportItem {
+  composes: textSmall from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--colorGrey700);
+  margin: 0;
+}
+
+.transportItem + .transportItem {
+  border-top: 1px solid var(--colorGrey100);
+}
+
+.transportTick {
+  color: var(--colorSuccessLight);
+  flex-shrink: 0;
+}
+
+
+/* ================ Portfolio ================ */
+
+.portfolioHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* A scroll rail until there is room for five across. */
+/* A carousel at every width: every uploaded photo is on the rail, and how many
+   are in view is just a function of the space there is. */
+.portfolioRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 72%;
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+
+  /* The scrollbar would sit under the tiles and fight the arrows. */
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  @media (--viewportSmall) {
+    grid-auto-columns: 45%;
+  }
+
+  @media (--viewportMedium) {
+    grid-auto-columns: 30%;
+  }
+
+  @media (--viewportLarge) {
+    /* Five across before it starts scrolling, matching the old row. */
+    grid-auto-columns: calc((100% - 4 * 12px) / 5);
+  }
+}
+
+.carouselControls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.carouselArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--colorGrey100);
+  border-radius: 50%;
+  background-color: var(--colorWhite);
+  color: var(--colorGrey700);
+  cursor: pointer;
+  transition: var(--transitionStyleButton);
+
+  &:hover {
+    border-color: var(--colorGrey300);
+  }
+}
+
+.carouselArrowDisabled {
+  color: var(--colorGrey300);
+  cursor: default;
+
+  &:hover {
+    border-color: var(--colorGrey100);
+  }
+}
+
+.portfolioCard {
+  scroll-snap-align: start;
+  margin: 0;
+}
+
+.portfolioImageWrapper {
+  border-radius: var(--borderRadiusMedium);
+  overflow: hidden;
+  background-color: var(--colorGrey50);
+}
+
+.portfolioImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portfolioImagePlaceholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--colorGrey50) 0%, var(--colorGrey100) 100%);
+}
+
+.portfolioTitle {
+  composes: textXSmall from global;
+  font-weight: var(--fontWeightSemiBold);
+  margin: 8px 0 0 0;
+}
+
+.portfolioCity {
+  composes: textXSmall from global;
+  color: var(--colorGrey700);
+  margin: 0;
+}
+
+/* ================ Reviews ================ */
+
+.reviewsSection {
+  padding-top: 8px;
+}
+
+/* MobileReviews and DesktopReviews are shared with the default profile, where
+   they separate themselves from the content above with a border-top and sit on
+   bare page with a bottom margin. Inside a card both read as stray - the card
+   edge is already the separator.
+   Note: the element selector is deliberate. A bare class would tie against
+   ProfilePage.module.css and leave the winner to bundle order. */
+.reviewsSection > div {
+  border-top: none;
+  margin-bottom: 0;
+}

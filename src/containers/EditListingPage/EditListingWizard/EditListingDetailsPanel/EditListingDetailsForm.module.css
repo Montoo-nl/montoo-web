@@ -79,3 +79,35 @@
     margin-top: 100px;
   }
 }
+
+/* Job location autocomplete. The predictions list is absolutely positioned, so
+   the field has to be the positioned ancestor. */
+.jobLocation {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.jobLocationInput {
+}
+
+.jobLocationIcon {
+  display: none;
+}
+
+.jobLocationPredictions {
+  position: absolute;
+  width: 100%;
+  top: 60px;
+  left: 0;
+  background-color: var(--marketplaceColor);
+  border-bottom-left-radius: var(--borderRadius);
+  border-bottom-right-radius: var(--borderRadius);
+  box-shadow: var(--boxShadowPopup);
+
+  /* Above the page, below the sticky topbar. */
+  z-index: calc(var(--zIndexTopbar) - 1);
+
+  @media (--viewportMedium) {
+    top: 64px;
+  }
+}

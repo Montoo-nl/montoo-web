@@ -7,6 +7,34 @@ import css from './ListingCard.module.css';
 
 const MIN_LENGTH_FOR_LONG_WORDS = 10;
 
+// How many parts of the address a card shows. Geocoded addresses come back
+// fine-grained - '4307 LJ, Oosterland, Zeeland, Nederland' - and a card only
+// has room for the broad strokes, so it keeps the last two: the region and the
+// country the job is in.
+const ADDRESS_PARTS_ON_CARD = 2;
+
+/**
+ * The tail end of an address, for a card that can't fit the whole thing.
+ *
+ * Shorter addresses are left alone rather than padded, so a place that is only
+ * written as 'Zeeland, Nederland' already reads correctly.
+ *
+ * @param {string} address the full address from publicData.location
+ * @returns {string|null} the last parts of it, or null when there is no address
+ */
+const shortLocationAddress = address => {
+  if (!address) {
+    return null;
+  }
+
+  const parts = address
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts.slice(-ADDRESS_PARTS_ON_CARD).join(', ') : null;
+};
+
 const priceData = (price, currency, intl) => {
   if (price && price.currency === currency) {
     const formattedPrice = formatMoney(intl, price);
@@ -110,6 +138,7 @@ export const getListingCardTranslations = (listing, config, intl) => {
       : title;
 
   const categories = config.categoryConfiguration?.categories || [];
+
   const categoryLabel =
     findCategoryLabel(categories, categoryLevel1) ||
     (typeof categoryLevel1 === 'string' ? categoryLevel1 : null);
@@ -126,7 +155,7 @@ export const getListingCardTranslations = (listing, config, intl) => {
     priceMessage,
     formattedPrice,
     cardAriaLabel,
-    locationAddress: location?.address || null,
+    locationAddress: shortLocationAddress(location?.address),
     categoryLabel,
   };
 };

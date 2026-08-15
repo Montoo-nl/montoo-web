@@ -13,7 +13,6 @@ import * as validators from '../../../util/validators';
 import { isUploadImageOverLimitError } from '../../../util/errors';
 import { getPropsForCustomUserFieldInputs } from '../../../util/userHelpers';
 import {
-  SERVICE_AREA_OPTIONS,
   certificateStoragePath,
   getCertificateTypeOptions,
   getSpecialisationOptions,
@@ -28,18 +27,22 @@ import {
   Button,
   ImageFromFile,
   IconSpinner,
-  FieldBoolean,
   FieldCheckbox,
-  FieldCheckboxGroup,
   FieldFileUpload,
+  FieldLocationAutocompleteInput,
   FieldTextInput,
   H4,
   CustomExtendedDataField,
 } from '../../../components';
 
-import PortfolioField, { MAX_PORTFOLIO_IMAGES } from './PortfolioField';
+import PortfolioField, {
+  MAX_PORTFOLIO_IMAGES,
+  portfolioDetailsRequired,
+} from './PortfolioField';
 
 import css from './ProfileSettingsForm.module.css';
+
+const identity = v => v;
 
 const ACCEPT_IMAGES = 'image/*';
 const UPLOAD_CHANGE_DELAY = 2000; // Show spinner so that browser has time to load img srcset
@@ -389,6 +392,7 @@ const TechnicianDetailsMaybe = props => {
     values,
     initialValues,
     formId,
+    userFieldProps,
     onUploadStateChange,
     intl,
   } = props;
@@ -414,18 +418,54 @@ const TechnicianDetailsMaybe = props => {
     <>
       <div className={css.sectionContainer}>
         <H4 as="h2" className={css.sectionTitle}>
-          <FormattedMessage id="ProfileSettingsForm.serviceAreaHeading" />
+          <FormattedMessage id="ProfileSettingsForm.baseLocationHeading" />
         </H4>
-        <FieldCheckboxGroup
-          id={formId ? `${formId}.serviceAreas` : 'serviceAreas'}
-          name="serviceAreas"
-          options={SERVICE_AREA_OPTIONS}
-          twoColumns
+        <FieldLocationAutocompleteInput
+          rootClassName={css.baseLocation}
+          inputClassName={css.baseLocationInput}
+          iconClassName={css.baseLocationIcon}
+          predictionsClassName={css.baseLocationPredictions}
+          name="baseLocation"
+          id={formId ? `${formId}.baseLocation` : 'baseLocation'}
+          label={intl.formatMessage({ id: 'ProfileSettingsForm.baseLocationLabel' })}
+          placeholder={intl.formatMessage({
+            id: 'ProfileSettingsForm.baseLocationPlaceholder',
+          })}
+          useDefaultPredictions={false}
+          // A base location is a town, not a doorstep - a technician says which
+          // place they work out of, and companies have no business seeing their
+          // street address.
+          typeLimit={['country', 'region', 'district', 'place']}
+          // The field holds an object, so the default string formatting of
+          // Final Form has to be turned off.
+          format={identity}
+          valueFromForm={values?.baseLocation}
+          // Required, and it has to be picked from the predictions rather than
+          // just typed - a free-text entry has no coordinates behind it.
+          validate={validators.composeValidators(
+            validators.autocompleteSearchRequired(
+              intl.formatMessage({ id: 'ProfileSettingsForm.baseLocationRequired' })
+            ),
+            validators.autocompletePlaceSelected(
+              intl.formatMessage({ id: 'ProfileSettingsForm.baseLocationNotRecognized' })
+            )
+          )}
         />
         <p className={css.extraInfo}>
-          <FormattedMessage id="ProfileSettingsForm.serviceAreaInfo" />
+          <FormattedMessage id="ProfileSettingsForm.baseLocationInfo" />
         </p>
       </div>
+
+      {/* The marketplace's own user fields, configured in Console. They sit here
+          rather than at the end of the form so that a technician's own details
+          read as one run, instead of being split by the uploads below. */}
+      {userFieldProps?.length > 0 ? (
+        <div className={css.sectionContainer}>
+          {userFieldProps.map(({ key, ...fieldProps }) => (
+            <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />
+          ))}
+        </div>
+      ) : null}
 
       {specialisationOptions.length > 0 ? (
         <div className={css.sectionContainer}>
@@ -444,19 +484,6 @@ const TechnicianDetailsMaybe = props => {
           </p>
         </div>
       ) : null}
-
-      <div className={css.sectionContainer}>
-        <H4 as="h2" className={css.sectionTitle}>
-          <FormattedMessage id="ProfileSettingsForm.equipmentHeading" />
-        </H4>
-        <FieldBoolean
-          className={css.companyVan}
-          id={formId ? `${formId}.hasCompanyVan` : 'hasCompanyVan'}
-          name="hasCompanyVan"
-          label={intl.formatMessage({ id: 'ProfileSettingsForm.hasCompanyVanLabel' })}
-          placeholder={intl.formatMessage({ id: 'ProfileSettingsForm.hasCompanyVanPlaceholder' })}
-        />
-      </div>
 
       <div className={css.sectionContainer}>
         <H4 as="h2" className={css.sectionTitle}>
@@ -518,6 +545,9 @@ const TechnicianDetailsMaybe = props => {
           name="portfolio"
           storagePath={portfolioStoragePath(currentUserId)}
           onUploadStateChange={onUploadStateChange}
+          validate={portfolioDetailsRequired(
+            intl.formatMessage({ id: 'ProfileSettingsForm.portfolioDetailsRequired' })
+          )}
         />
       </div>
     </>
@@ -871,15 +901,20 @@ class ProfileSettingsFormComponent extends Component {
                 values={values}
                 initialValues={initialValues}
                 formId={formId}
+                userFieldProps={userFieldProps}
                 onUploadStateChange={this.handleFileUploadStateChange}
                 intl={intl}
               />
 
-              <div className={classNames(css.sectionContainer, css.lastSection)}>
-                {userFieldProps.map(({ key, ...fieldProps }) => (
-                  <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />
-                ))}
-              </div>
+              {/* A technician's user fields are rendered inside their own
+                  section above, so this is for everyone else. */}
+              {!isTechnician ? (
+                <div className={classNames(css.sectionContainer, css.lastSection)}>
+                  {userFieldProps.map(({ key, ...fieldProps }) => (
+                    <CustomExtendedDataField key={key} {...fieldProps} formId={formId} />
+                  ))}
+                </div>
+              ) : null}
               {submitError}
               <Button
                 className={css.submitButton}

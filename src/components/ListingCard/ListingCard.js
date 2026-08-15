@@ -190,7 +190,7 @@ export const ListingCard = props => {
               <IconLocation className={css.locationIcon} />
               <span className={css.locationText}>{locationAddress}</span>
             </span>
-          ) : showAuthorInfo ? (
+          ) : false ? (
             <span className={css.location}>
                <IconLocation className={css.locationIcon} />
               <span className={css.locationText}>{authorName}</span>

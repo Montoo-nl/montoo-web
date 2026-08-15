@@ -68,6 +68,8 @@ const fetchFeaturedListingsPayloadCreator = async (arg, thunkAPI) => {
           'publicData.priceVariationsEnabled',
           'publicData.priceVariants',
           'publicData.categoryLevel1',
+          'publicData.compensation',
+          'publicData.location',
         ],
         'fields.image': [
           'variants.listing-card',

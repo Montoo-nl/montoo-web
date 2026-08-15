@@ -4,6 +4,10 @@
 // any of these fields on their own profile settings page.      //
 /////////////////////////////////////////////////////////////////
 
+import { types as sdkTypes } from '../util/sdkLoader';
+
+const { LatLng } = sdkTypes;
+
 // Note: neither the specialisations nor the certifications a technician can
 // pick are listed here. Both come from the hosted configuration, so that a
 // technician's profile always lines up with the jobs companies post:
@@ -22,27 +26,60 @@ export const CERTIFICATIONS_LISTING_FIELD_KEY = 'certifications';
 export const CATEGORY_LEVEL_1_KEY = 'categoryLevel1';
 
 /**
- * The regions a technician can say they work in: the twelve provinces of the
- * Netherlands. Saved as an array of keys to publicData.serviceAreas.
- *
- * These are fixed geography rather than hosted configuration, so they live
- * here. The labels are the Dutch names, which is how they are written on a
- * Dutch marketplace regardless of the UI language.
+ * Key of the user field whose enum options are the regions a technician works
+ * in. The field itself is configured in Console, alongside every other user
+ * field, so the options are read from the hosted configuration rather than
+ * being listed here.
  */
-export const SERVICE_AREA_OPTIONS = [
-  { key: 'drenthe', label: 'Drenthe' },
-  { key: 'flevoland', label: 'Flevoland' },
-  { key: 'friesland', label: 'Friesland' },
-  { key: 'gelderland', label: 'Gelderland' },
-  { key: 'groningen', label: 'Groningen' },
-  { key: 'limburg', label: 'Limburg' },
-  { key: 'noord-brabant', label: 'Noord-Brabant' },
-  { key: 'noord-holland', label: 'Noord-Holland' },
-  { key: 'overijssel', label: 'Overijssel' },
-  { key: 'utrecht', label: 'Utrecht' },
-  { key: 'zeeland', label: 'Zeeland' },
-  { key: 'zuid-holland', label: 'Zuid-Holland' },
-];
+export const SERVICE_AREA_USER_FIELD_KEY = 'serviceAreas';
+
+/**
+ * The regions a technician can say they work in, taken from the hosted user
+ * field. Saved as an array of option values to publicData.serviceAreas.
+ *
+ * Note: only the 'option' value is treated as stable. Labels can be edited in
+ * Console at any time, so they are only read for display, and the option value
+ * is used as the label if an option has none.
+ *
+ * @param {Object} config marketplace configuration
+ * @returns {Array<Object>} [{ key, label }] - empty if the user field is missing
+ */
+export const getServiceAreaOptions = config => {
+  const userFields = config?.user?.userFields || [];
+  const serviceAreaField = userFields.find(f => f.key === SERVICE_AREA_USER_FIELD_KEY);
+
+  return (serviceAreaField?.enumOptions || [])
+    .filter(o => o?.option != null)
+    .map(o => ({
+      key: `${o.option}`,
+      label: o.label || `${o.option}`,
+    }));
+};
+
+/**
+ * Key of the user field listing what a technician can bring to a job - a van, a
+ * trailer, ladders, and so on. Configured in Console like the service areas.
+ */
+export const EQUIPMENT_USER_FIELD_KEY = 'equipments';
+
+/**
+ * The equipment a technician can say they have, taken from the hosted user
+ * field. Saved as an array of option values to publicData.equipments.
+ *
+ * @param {Object} config marketplace configuration
+ * @returns {Array<Object>} [{ key, label }] - empty if the user field is missing
+ */
+export const getEquipmentOptions = config => {
+  const userFields = config?.user?.userFields || [];
+  const equipmentField = userFields.find(f => f.key === EQUIPMENT_USER_FIELD_KEY);
+
+  return (equipmentField?.enumOptions || [])
+    .filter(o => o?.option != null)
+    .map(o => ({
+      key: `${o.option}`,
+      label: o.label || `${o.option}`,
+    }));
+};
 
 /**
  * The specialisations a technician can pick, i.e. the top level (level 1)
@@ -157,6 +194,46 @@ export const getMissingJobRequirements = (listingPublicData, currentUser, config
       getCertificateTypeOptions(config)
     ),
   };
+};
+
+/**
+ * A technician's base location: where they set out from, as opposed to the
+ * provinces they are willing to travel to.
+ *
+ * Listings have a `geolocation` attribute of their own; users do not. So the
+ * place has to live in extended data, which only accepts plain JSON - the
+ * LatLng instance the autocomplete produces is not that. It is flattened to two
+ * numbers on the way in and rebuilt on the way out, because the form's
+ * autocompletePlaceSelected validator checks `origin instanceof LatLng` and
+ * would reject a plain object.
+ *
+ * Stored as publicData.baseLocation = { address, lat, lng }.
+ *
+ * @param {Object} location the form value from FieldLocationAutocompleteInput
+ * @returns {Object|null} the value to save, or null when nothing was picked
+ */
+export const serializeBaseLocation = location => {
+  const { address, origin } = location?.selectedPlace || {};
+  const hasCoordinates = typeof origin?.lat === 'number' && typeof origin?.lng === 'number';
+
+  return address && hasCoordinates ? { address, lat: origin.lat, lng: origin.lng } : null;
+};
+
+/**
+ * Turns a saved base location back into what the autocomplete field expects.
+ *
+ * @param {Object} baseLocation publicData.baseLocation
+ * @returns {Object|undefined} the form value, or undefined when nothing is saved
+ *   - undefined rather than an empty object, so Final Form doesn't treat an
+ *     unset field as a change and reinitialise the form
+ */
+export const deserializeBaseLocation = baseLocation => {
+  const { address, lat, lng } = baseLocation || {};
+  const hasCoordinates = typeof lat === 'number' && typeof lng === 'number';
+
+  return address && hasCoordinates
+    ? { search: address, selectedPlace: { address, origin: new LatLng(lat, lng) } }
+    : undefined;
 };
 
 /**

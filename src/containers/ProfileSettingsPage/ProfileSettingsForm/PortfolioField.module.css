@@ -8,8 +8,9 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
+  /* Wide enough that the caption placeholder isn't clipped mid-word. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -19,11 +20,17 @@
   position: relative;
   margin: 0;
   padding: 0;
-  aspect-ratio: 4 / 3;
   border-radius: var(--borderRadiusMedium);
   border: 1px solid var(--colorGrey100);
   overflow: hidden;
   background-color: var(--colorGrey50);
+}
+
+/* The image keeps the 4/3 ratio; the item itself grows to fit the fields. */
+.imageWrapper {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
 }
 
 .image {
@@ -31,6 +38,41 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--colorWhite);
+  border-top: 1px solid var(--colorGrey100);
+}
+
+.detailInput {
+  width: 100%;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 8px 10px;
+  border: 1px solid var(--colorGrey100);
+  border-radius: var(--borderRadius);
+  background-color: var(--colorWhite);
+  color: var(--colorGrey700);
+
+  &:focus {
+    outline: none;
+    border-color: var(--colorGrey300);
+  }
+
+  &::placeholder {
+    color: var(--colorGrey300);
+  }
+}
+
+/* Both are required, so an empty one is marked once the field has been touched
+   or the form has been submitted. */
+.detailInputError {
+  border-color: var(--colorFail);
 }
 
 .removeButton {
@@ -53,6 +95,7 @@
   }
 }
 
+/* No image yet, so this one carries the ratio itself. */
 .itemPending {
   display: flex;
   flex-direction: column;
@@ -60,6 +103,7 @@
   justify-content: center;
   gap: 4px;
   padding: 8px;
+  aspect-ratio: 4 / 3;
   border-style: dashed;
 }
 

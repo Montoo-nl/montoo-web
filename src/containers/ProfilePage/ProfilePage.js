@@ -50,6 +50,7 @@ import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
 import NotFoundPage from '../../containers/NotFoundPage/NotFoundPage';
 
+import TechnicianProfile from './TechnicianProfile/TechnicianProfile';
 import css from './ProfilePage.module.css';
 
 const MAX_MOBILE_SCREEN_WIDTH = 768;
@@ -397,6 +398,13 @@ export const ProfilePageComponent = props => {
   const hasNoViewingRightsOnPrivateMarketplace = isPrivateMarketplace && hasNoViewingRightsUser;
 
   const userTypeRoles = getCurrentUserTypeRoles(config, profileUser);
+  // Technicians get a profile of their own: what they can do, what they have
+  // built, and what companies have said about them. Companies keep the default.
+  // The !customer half matters - getCurrentUserTypeRoles falls back to both
+  // roles being true whenever the user type can't be resolved (logged-out
+  // viewer, unset userType, hosted config not loaded), and a bare .provider
+  // would then give every unknown profile the technician layout.
+  const isTechnicianProfile = userTypeRoles.provider && !userTypeRoles.customer;
 
   const isDataLoaded = isPreview
     ? currentUser != null || userShowError != null
@@ -464,31 +472,48 @@ export const ProfilePageComponent = props => {
         name: schemaTitle,
       }}
     >
-      <LayoutSideNavigation
-        sideNavClassName={css.aside}
-        topbar={<TopbarContainer />}
-        sideNav={
-          <AsideContent
-            user={profileUser}
-            showLinkToProfileSettingsPage={mounted && isCurrentUser}
-            displayName={displayName}
-          />
-        }
-        footer={<FooterContainer />}
-      >
-        <MainContent
-          bio={bio}
+      {isTechnicianProfile ? (
+        <TechnicianProfile
+          profileUser={profileUser}
           displayName={displayName}
-          userShowError={userShowError}
+          bio={bio}
           publicData={publicData}
-          metadata={metadata}
-          userFieldConfig={userFields}
+          userShowError={userShowError}
           hideReviews={hasNoViewingRightsOnPrivateMarketplace}
-          intl={intl}
           userTypeRoles={userTypeRoles}
+          showLinkToProfileSettingsPage={mounted && isCurrentUser}
+          intl={intl}
+          MobileReviews={MobileReviews}
+          DesktopReviews={DesktopReviews}
           {...rest}
         />
-      </LayoutSideNavigation>
+      ) : (
+        <LayoutSideNavigation
+          sideNavClassName={css.aside}
+          topbar={<TopbarContainer />}
+          sideNav={
+            <AsideContent
+              user={profileUser}
+              showLinkToProfileSettingsPage={mounted && isCurrentUser}
+              displayName={displayName}
+            />
+          }
+          footer={<FooterContainer />}
+        >
+          <MainContent
+            bio={bio}
+            displayName={displayName}
+            userShowError={userShowError}
+            publicData={publicData}
+            metadata={metadata}
+            userFieldConfig={userFields}
+            hideReviews={hasNoViewingRightsOnPrivateMarketplace}
+            intl={intl}
+            userTypeRoles={userTypeRoles}
+            {...rest}
+          />
+        </LayoutSideNavigation>
+      )}
     </Page>
   );
 };

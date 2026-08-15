@@ -3,7 +3,7 @@ import classNames from 'classnames';
 
 import { injectIntl, intlShape } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
-import { formatMoney } from '../../../util/currency';
+import { formatMoney, moneyFromExtendedData } from '../../../util/currency';
 import { ensureListing } from '../../../util/data';
 import { isPriceVariationsEnabled } from '../../../util/configHelpers';
 
@@ -29,11 +29,22 @@ class SearchMapPriceLabel extends Component {
     const nextListing = ensureListing(nextProps.listing);
     const isSameListing = currentListing.id.uuid === nextListing.id.uuid;
     const hasSamePrice = currentListing.attributes.price === nextListing.attributes.price;
+    // What the label shows comes from the compensation, so a change there has to
+    // re-render just as a price change does.
+    const hasSameCompensation =
+      currentListing.attributes.publicData?.compensation ===
+      nextListing.attributes.publicData?.compensation;
     const hasSameActiveStatus = this.props.isActive === nextProps.isActive;
     const hasSameRefreshToken =
       this.props.mapComponentRefreshToken === nextProps.mapComponentRefreshToken;
 
-    return !(isSameListing && hasSamePrice && hasSameActiveStatus && hasSameRefreshToken);
+    return !(
+      isSameListing &&
+      hasSamePrice &&
+      hasSameCompensation &&
+      hasSameActiveStatus &&
+      hasSameRefreshToken
+    );
   }
 
   render() {
@@ -49,12 +60,17 @@ class SearchMapPriceLabel extends Component {
     const currentListing = ensureListing(listing);
     const { price, publicData, title } = currentListing.attributes;
 
+    // A job's amount is the compensation the company offers, saved to
+    // publicData. The listing's own price is the fallback, for anything created
+    // before compensation existed - same as the listing card does.
+    const displayedPrice = moneyFromExtendedData(publicData?.compensation) || price;
+
     // Create formatted price if currency is known or alternatively show just the unknown currency.
     const formattedPrice =
-      price && price.currency === config.currency
-        ? formatMoney(intl, price)
-        : price?.currency
-        ? price.currency
+      displayedPrice && displayedPrice.currency === config.currency
+        ? formatMoney(intl, displayedPrice)
+        : displayedPrice?.currency
+        ? displayedPrice.currency
         : null;
 
     const priceValue = formattedPrice

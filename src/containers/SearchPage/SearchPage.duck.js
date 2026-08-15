@@ -451,6 +451,7 @@ export const loadData = (params, search, config) => (dispatch, getState, sdk) =>
         'publicData.priceVariants',
         'publicData.compensation',
         'publicData.categoryLevel1',
+        'publicData.location',
       ],
       'fields.user': ['profile.displayName', 'profile.abbreviatedName'],
       'fields.image': [

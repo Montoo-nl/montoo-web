@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
 
@@ -25,7 +25,11 @@ import { H3, H4, Modal, Page, UserNav, NamedLink, LayoutSingleColumn } from '../
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer';
 import FooterContainer from '../../containers/FooterContainer/FooterContainer';
 
-import { getCertificateTypeOptions } from '../../config/configTechnician';
+import {
+  deserializeBaseLocation,
+  getCertificateTypeOptions,
+  serializeBaseLocation,
+} from '../../config/configTechnician';
 
 import ProfileSettingsForm from './ProfileSettingsForm/ProfileSettingsForm';
 
@@ -62,6 +66,19 @@ const pickSpecialisationExperience = (specialisations, experience) => {
   }, {});
 
   return Object.keys(picked).length > 0 ? picked : null;
+};
+
+// Portfolio images, with the caption and city the technician typed alongside
+// each one. Blank text is left out rather than stored as an empty string, so the
+// profile page can treat "no caption" as one thing.
+const pickPortfolio = portfolio => {
+  const picked = (portfolio || []).map(({ title, city, ...image }) => ({
+    ...image,
+    ...(title?.trim() ? { title: title.trim() } : {}),
+    ...(city?.trim() ? { city: city.trim() } : {}),
+  }));
+
+  return picked.length > 0 ? picked : null;
 };
 
 // A user whose profile hasn't been approved yet. The other states are 'active'
@@ -313,10 +330,9 @@ export const ProfileSettingsPageComponent = props => {
       lastName,
       displayName,
       bio: rawBio,
-      serviceAreas,
+      baseLocation,
       specialisations,
       specialisationExperience,
-      hasCompanyVan,
       portfolio,
       identityDocument,
       insuranceDocument,
@@ -341,20 +357,24 @@ export const ProfileSettingsPageComponent = props => {
     // them. The documents themselves are only shared with transaction parties.
     const technicianPublicDataMaybe = isTechnician
       ? {
-          serviceAreas: serviceAreas?.length > 0 ? serviceAreas : null,
-          // The service area used to be a free-text field. Clear whatever a
-          // technician wrote there, now that it is a list of provinces.
-          serviceArea: null,
+          // Where the technician sets out from, as opposed to the provinces
+          // below, which are where they are willing to travel to. Users have no
+          // geolocation attribute of their own, so the place is flattened to
+          // plain numbers - see serializeBaseLocation.
+          baseLocation: serializeBaseLocation(baseLocation),
+          // Note: serviceAreas is no longer written here. It is a Console-managed
+          // user field now, so pickUserFieldsData above owns it - writing it here
+          // as well would overwrite whatever that saved with a null.
           specialisations: specialisations?.length > 0 ? specialisations : null,
           specialisationExperience: pickSpecialisationExperience(
             specialisations,
             specialisationExperience
           ),
-          // FieldBoolean gives '' when the question is left unanswered
-          hasCompanyVan: typeof hasCompanyVan === 'boolean' ? hasCompanyVan : null,
+          // Note: equipment is a Console-managed user field now, like the
+          // service areas above - pickUserFieldsData owns both.
           // Work images are meant to be seen, so they are public alongside the
           // rest of what a company looks at when picking a technician.
-          portfolio: portfolio?.length > 0 ? portfolio : null,
+          portfolio: pickPortfolio(portfolio),
         }
       : {};
     const technicianProtectedDataMaybe = isTechnician
@@ -413,6 +433,16 @@ export const ProfileSettingsPageComponent = props => {
   const isUnauthorizedUser = currentUser && !isUserAuthorized(currentUser);
 
   const { userType } = publicData || {};
+
+  // The autocomplete field wants a LatLng instance, which has to be rebuilt from
+  // the two numbers stored in publicData. Memoised because a fresh object every
+  // render would fail Final Form's shallow comparison of initialValues and
+  // reinitialise the form, discarding whatever the technician had typed.
+  const baseLocationInitialValue = useMemo(
+    () => deserializeBaseLocation(publicData?.baseLocation),
+    [publicData?.baseLocation]
+  );
+
   const profileImageId = user.profileImage ? user.profileImage.id : null;
   const profileImage = image || { imageId: profileImageId };
   const userTypeConfig = userTypes.find(config => config.userType === userType);
@@ -426,10 +456,9 @@ export const ProfileSettingsPageComponent = props => {
   // Final Form reinitialize the form and discard the user's input.
   const technicianInitialValuesMaybe = isTechnician
     ? {
-        serviceAreas: publicData?.serviceAreas,
+        baseLocation: baseLocationInitialValue,
         specialisations: publicData?.specialisations,
         specialisationExperience: publicData?.specialisationExperience,
-        hasCompanyVan: publicData?.hasCompanyVan,
         portfolio: publicData?.portfolio,
         identityDocument: protectedData?.identityDocument,
         insuranceDocument: protectedData?.insuranceDocument,
