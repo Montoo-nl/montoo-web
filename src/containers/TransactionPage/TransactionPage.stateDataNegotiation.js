@@ -302,7 +302,8 @@ export const getStateDataForNegotiationProcess = (txInfo, processInfo) => {
           {
             type: 'durationSinceTransition',
             action: 'disable',
-            sinceTransition: transitions.CONFIRM_PAYMENT, // transaction.attributes.transitions array contains createdAt
+            // transaction.attributes.transitions array contains createdAt
+            sinceTransition: [transitions.CONFIRM_PAYMENT, transitions.CONFIRM_PUSH_PAYMENT],
             days: 70, // Note: for now, only days are supported
             disabledReason: {
               translationKey: `TransactionPage.${processName}.${CUSTOMER}.${states.DELIVERED}.disabled.outdated`,

@@ -25,8 +25,17 @@ const stripeWebhooks = async (req, res) => {
   // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded':
-      const paymentIntentSucceeded = event.data.object;
-      confirmPaymentTransition(paymentIntentSucceeded);
+      try {
+        // Awaited on purpose. The customer's money is already captured at this
+        // point, so if the confirm transition doesn't happen the payment is in
+        // limbo - answering non-2xx makes Stripe redeliver instead of losing it.
+        // confirmPaymentTransition is a no-op on a repeat delivery.
+        await confirmPaymentTransition(event.data.object);
+      } catch (e) {
+        console.error('Failed to confirm push payment', e);
+        res.status(500).send('Failed to confirm push payment');
+        return;
+      }
       break;
 
     default:

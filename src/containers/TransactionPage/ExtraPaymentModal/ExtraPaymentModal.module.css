@@ -69,6 +69,28 @@
   margin-top: 24px;
 }
 
+.paymentMethodType,
+.idealName {
+  margin-bottom: 18px;
+}
+
+.paymentMethodType > select,
+.idealName > input {
+  margin-top: 6px;
+}
+
+.idealInfo {
+  composes: h5 from global;
+  color: var(--colorGrey700);
+  margin: 0 0 12px 0;
+}
+
+.awaitingConfirmation {
+  composes: h5 from global;
+  color: var(--colorGrey700);
+  margin: 12px 0 0 0;
+}
+
 .paymentForm {
   margin-top: 24px;
 }

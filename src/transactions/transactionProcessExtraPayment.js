@@ -26,6 +26,12 @@ export const transitions = {
   // The card has been confirmed in the browser
   CONFIRM_PAYMENT: 'transition/confirm-payment',
 
+  // The push counterparts, for iDEAL. They run through the same states as the
+  // card pair; only the confirm differs in who makes it - the operator, from
+  // the Stripe webhook, because the browser leaves the page for the bank.
+  INITIATE_PUSH_PAYMENT: 'transition/initiate-push-payment',
+  CONFIRM_PUSH_PAYMENT: 'transition/confirm-push-payment',
+
   // The request is turned down, taken back, or left unanswered
   DECLINE: 'transition/decline',
   WITHDRAW: 'transition/withdraw',
@@ -63,6 +69,7 @@ export const graph = {
     [states.PAYMENT_REQUESTED]: {
       on: {
         [transitions.INITIATE_PAYMENT]: states.PENDING_CONFIRMATION,
+        [transitions.INITIATE_PUSH_PAYMENT]: states.PENDING_CONFIRMATION,
         [transitions.DECLINE]: states.DECLINED,
         [transitions.WITHDRAW]: states.DECLINED,
         [transitions.OPERATOR_DECLINE]: states.DECLINED,
@@ -72,6 +79,7 @@ export const graph = {
     [states.PENDING_CONFIRMATION]: {
       on: {
         [transitions.CONFIRM_PAYMENT]: states.PAID,
+        [transitions.CONFIRM_PUSH_PAYMENT]: states.PAID,
         [transitions.EXPIRE_PAYMENT]: states.EXPIRED,
       },
     },
@@ -112,11 +120,22 @@ export const splitExtraPaymentAmount = amount => {
   };
 };
 
+// The transitions that mean the payment went through, whichever way it was paid
+const paidTransitions = [transitions.CONFIRM_PAYMENT, transitions.CONFIRM_PUSH_PAYMENT];
+
+// The transitions that leave the request open for the company to act on
+const payableTransitions = [
+  transitions.REQUEST_EXTRA_PAYMENT,
+  transitions.INITIATE_PAYMENT,
+  transitions.INITIATE_PUSH_PAYMENT,
+];
+
 // Check if a transition is the kind that moves money
 export const isRelevantPastTransition = transition => {
   return [
     transitions.REQUEST_EXTRA_PAYMENT,
     transitions.CONFIRM_PAYMENT,
+    transitions.CONFIRM_PUSH_PAYMENT,
     transitions.DECLINE,
     transitions.WITHDRAW,
     transitions.OPERATOR_DECLINE,
@@ -124,20 +143,24 @@ export const isRelevantPastTransition = transition => {
 };
 
 // Requests that are still waiting for the company to act
-export const isPending = lastTransition =>
-  [transitions.REQUEST_EXTRA_PAYMENT, transitions.INITIATE_PAYMENT].includes(lastTransition);
+export const isPending = lastTransition => payableTransitions.includes(lastTransition);
 
 // Requests that have been paid
-export const isPaid = lastTransition => transitions.CONFIRM_PAYMENT === lastTransition;
+export const isPaid = lastTransition => paidTransitions.includes(lastTransition);
 
-// Whether the company can still pay this request
-export const isPayable = lastTransition =>
-  [transitions.REQUEST_EXTRA_PAYMENT, transitions.INITIATE_PAYMENT].includes(lastTransition);
+// Whether the company can still pay this request. A push payment that was
+// started but never confirmed is included: the customer has to be able to come
+// back and finish it.
+export const isPayable = lastTransition => payableTransitions.includes(lastTransition);
 
-// This process has no reviews or refunds
+// This process has no reviews
 export const isCustomerReview = () => false;
 export const isProviderReview = () => false;
 export const isPrivileged = transition => [transitions.REQUEST_EXTRA_PAYMENT].includes(transition);
-export const isCompleted = lastTransition => transitions.CONFIRM_PAYMENT === lastTransition;
+export const isCompleted = lastTransition => paidTransitions.includes(lastTransition);
+
+// Nothing in this process refunds: a card in pending-confirmation holds an
+// uncaptured authorization, and a push payment can only ever move forward to
+// paid.
 export const isRefunded = () => false;
 export const statesNeedingProviderAttention = [];

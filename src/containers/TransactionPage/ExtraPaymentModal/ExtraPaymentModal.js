@@ -7,29 +7,54 @@ import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { propTypes } from '../../../util/types';
 import { formatMoney } from '../../../util/currency';
 import { denormalisedResponseEntities } from '../../../util/data';
-import { confirmCardPayment } from '../../../ducks/stripe.duck';
+import { STRIPE_JS_LOADED_EVENT } from '../../../util/includeScripts';
+import { confirmCardPayment, retrievePaymentIntent } from '../../../ducks/stripe.duck';
 import { transitions } from '../../../transactions/transactionProcessExtraPayment';
 
 import { IconSpinner, Modal, PrimaryButton, SecondaryButton } from '../../../components';
 
 import { stripeCustomer } from '../../CheckoutPage/CheckoutPage.duck';
+import {
+  PAYMENT_METHOD_TYPE_CARD,
+  PAYMENT_METHOD_TYPE_IDEAL,
+} from '../../CheckoutPage/CheckoutPageTransactionHelpers';
 import EnhancedPaymentMethodsForm from '../../PaymentMethodsPage/PaymentMethodsForm/PaymentMethodsForm';
 
 import { makeTransition } from '../TransactionPage.duck';
 import css from './ExtraPaymentModal.module.css';
 
 /**
+ * The first version of the extra-payment process that has the push-payment
+ * transitions in their current shape. Requests created before it stay on their
+ * own version for up to a week and cannot be paid with iDEAL - the transition
+ * simply isn't there - so the choice is not offered for them.
+ */
+const PUSH_PAYMENT_MIN_PROCESS_VERSION = 3;
+
+// PaymentIntent statuses where the customer's money is already with Stripe.
+// For a push payment that means captured - there is nothing left to pay, and
+// nothing safe to decline.
+const SETTLED_PI_STATUSES = ['processing', 'requires_capture', 'succeeded'];
+
+/**
  * The company reviews an extra payment a technician asked for, and pays it.
  *
  * The request is a transaction of its own on the extra-payment process. Paying
  * it takes three steps, the same shape as the main checkout:
- *   1. 'initiate-payment' creates the Stripe payment intent
- *   2. the browser confirms the card with Stripe
+ *   1. 'initiate-payment' (or 'initiate-push-payment') creates the payment intent
+ *   2. the browser confirms it with Stripe
  *   3. 'confirm-payment' captures it and pays the technician out
  *
- * Both card cases are handled here: a saved card is charged with one button,
- * and without one the card form is shown in the modal so the payment can be
- * made without leaving the page.
+ * Card and iDEAL both end up here, and they part ways at step 2. A card is
+ * confirmed in this window and the transaction is completed straight after. An
+ * iDEAL payment sends the customer to their own bank, so the browser leaves the
+ * page entirely; Stripe brings them back to the job page, and the transaction is
+ * confirmed by the operator from the Stripe webhook rather than from here.
+ *
+ * Because of that, the modal has to be resumable. Whatever it finds when it
+ * opens - an intent half-paid, an intent the customer walked away from, money
+ * already taken and waiting on the webhook - it has to say so and offer only the
+ * actions that are actually safe.
  *
  * @component
  * @param {Object} props
@@ -65,6 +90,40 @@ const ExtraPaymentModal = props => {
   // Whether the saved card is known yet. Starts true so the modal never shows
   // the card form for a moment before finding out there is a saved card.
   const [isLoadingCard, setLoadingCard] = useState(true);
+  // The transaction as this modal last saw it. The prop is a snapshot taken when
+  // the modal was opened, and a transition made in here moves the transaction on
+  // without the parent refetching - so the snapshot goes stale mid-session and
+  // every decision below (which decline is legal, whether the method is locked)
+  // would be made against the wrong state.
+  const [txOverride, setTxOverride] = useState(null);
+  const [paymentMethodChoice, setPaymentMethodChoice] = useState(PAYMENT_METHOD_TYPE_CARD);
+  const [idealName, setIdealName] = useState(null);
+  // Status of an intent that already exists, once we've asked Stripe for it.
+  const [paymentIntentStatus, setPaymentIntentStatus] = useState(null);
+  const [isCheckingPaymentIntent, setCheckingPaymentIntent] = useState(false);
+
+  const tx = txOverride || extraPaymentTx;
+  const paymentIntents = tx?.attributes?.protectedData?.stripePaymentIntents;
+  const clientSecret = paymentIntents?.default?.stripePaymentIntentClientSecret;
+
+  // Stripe.js is deferred on this route, so it may not be there when the modal
+  // opens. Without the event the Pay button can end up permanently disabled.
+  useEffect(() => {
+    const publishableKey = config.stripe.publishableKey;
+    if (!isOpen || !publishableKey) {
+      return;
+    }
+
+    const initStripe = () => {
+      if (typeof window !== 'undefined' && window.Stripe) {
+        setStripe(prev => prev || window.Stripe(publishableKey));
+      }
+    };
+
+    initStripe();
+    window.addEventListener(STRIPE_JS_LOADED_EVENT, initStripe);
+    return () => window.removeEventListener(STRIPE_JS_LOADED_EVENT, initStripe);
+  }, [isOpen, config.stripe.publishableKey]);
 
   // The saved card lives on the Stripe customer, which isn't part of the
   // currentUser the page already has - it has to be fetched.
@@ -72,62 +131,170 @@ const ExtraPaymentModal = props => {
     if (!isOpen) {
       return;
     }
-
     setLoadingCard(true);
     Promise.resolve(dispatch(stripeCustomer())).finally(() => setLoadingCard(false));
+  }, [isOpen, dispatch]);
 
-    const publishableKey = config.stripe.publishableKey;
-    if (window.Stripe && publishableKey) {
-      setStripe(window.Stripe(publishableKey));
+  // Reset per-session state whenever the modal opens.
+  useEffect(() => {
+    if (isOpen) {
+      setTxOverride(null);
+      setPayError(null);
+      setIdealName(null);
+      setPaymentMethodChoice(PAYMENT_METHOD_TYPE_CARD);
+      setPaymentIntentStatus(null);
     }
-  }, [isOpen, config.stripe.publishableKey, dispatch]);
+  }, [isOpen]);
+
+  // If an intent already exists, Stripe is the only source of truth for whether
+  // the money has moved - the transaction can't tell us, because a push payment
+  // is confirmed by a webhook that may not have arrived yet.
+  useEffect(() => {
+    if (!isOpen || !stripe || !clientSecret) {
+      return;
+    }
+    let cancelled = false;
+    setCheckingPaymentIntent(true);
+    dispatch(retrievePaymentIntent({ stripe, stripePaymentIntentClientSecret: clientSecret }))
+      .then(response => {
+        if (!cancelled) {
+          setPaymentIntentStatus(response?.paymentIntent?.status || null);
+        }
+      })
+      .catch(() => {
+        // Leave the status unknown and let the normal pay path deal with it.
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCheckingPaymentIntent(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, stripe, clientSecret, dispatch]);
 
   if (!extraPaymentTx) {
     return null;
   }
 
-  const { protectedData, payinTotal, lastTransition } = extraPaymentTx.attributes || {};
-  const { extraPaymentReason } = protectedData || {};
+  const { protectedData, payinTotal, lastTransition, processVersion } = tx.attributes || {};
+  const { extraPaymentReason, parentTxId } = protectedData || {};
 
   const savedPaymentMethodId =
     currentUser?.stripeCustomer?.defaultPaymentMethod?.attributes?.stripePaymentMethodId;
   const { firstName, lastName } = currentUser?.attributes?.profile || {};
+  const defaultBillingName = `${firstName || ''} ${lastName || ''}`.trim();
+  const billingName = idealName ?? defaultBillingName;
+
+  // Once an intent exists the method is fixed: a card intent cannot be confirmed
+  // as a push payment, or the other way round.
+  const hasPaymentIntent = !!paymentIntents;
+  const lockedPaymentMethodType = protectedData?.paymentMethodType || PAYMENT_METHOD_TYPE_CARD;
+  // Derived during render rather than synced in an effect, so the very first
+  // render after opening is already correct and no card element gets mounted
+  // just to be torn down again.
+  const paymentMethodType = hasPaymentIntent ? lockedPaymentMethodType : paymentMethodChoice;
+  const isIdeal = paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
+
+  // iDEAL has to be able to send the customer back to this job page afterwards,
+  // and the process version has to be one that knows the push transitions.
+  const supportsPushPayment =
+    !!parentTxId && (processVersion == null || processVersion >= PUSH_PAYMENT_MIN_PROCESS_VERSION);
+
+  const returnUrl =
+    typeof window !== 'undefined' && parentTxId
+      ? `${window.location.origin}/order/${parentTxId}?extraPayment=${tx.id?.uuid}`
+      : null;
+
+  // The money is with Stripe already and the transaction just hasn't caught up.
+  // Offering Pay here would charge nothing and say nothing; offering Decline
+  // would send a captured payment to a terminal state.
+  const isAwaitingConfirmation = SETTLED_PI_STATUSES.includes(paymentIntentStatus);
+
+  // transition/decline is only legal from :state/payment-requested. Once either
+  // kind of payment intent exists the transaction has moved to
+  // pending-confirmation, where the process offers no way to decline - so the
+  // button is not shown there rather than failing when pressed.
+  const declineTransition =
+    lastTransition === transitions.REQUEST_EXTRA_PAYMENT ? transitions.DECLINE : null;
 
   /**
-   * Creates the payment intent if it isn't there yet, confirms the card, and
-   * completes the transaction.
+   * Creates the payment intent if it isn't there yet, confirms it with Stripe,
+   * and completes the transaction.
+   *
+   * For iDEAL the last part doesn't happen here: confirming sends the browser to
+   * the customer's bank and the webhook takes it from there.
    *
    * @param {Object} [cardData] - { stripe, card, paymentParams } from the card
-   * form. Omitted when paying with the saved card.
+   * form. Omitted when paying with the saved card or with iDEAL.
    */
   const handlePay = async cardData => {
     try {
       setPayError(null);
       setPayInProgress(true);
 
-      let tx = extraPaymentTx;
-      let paymentIntents = tx.attributes?.protectedData?.stripePaymentIntents;
+      let currentTx = tx;
+      let intents = currentTx.attributes?.protectedData?.stripePaymentIntents;
 
-      if (!paymentIntents) {
+      if (!intents) {
+        const initiateTransition = isIdeal
+          ? transitions.INITIATE_PUSH_PAYMENT
+          : transitions.INITIATE_PAYMENT;
+        // stripe-create-payment-intent-push takes the allowed payment method
+        // types as a mandatory transition parameter, and the choice is kept on
+        // the transaction so coming back here knows which intent exists.
+        const initiateParams = isIdeal
+          ? {
+              paymentMethodTypes: [PAYMENT_METHOD_TYPE_IDEAL],
+              protectedData: { paymentMethodType: PAYMENT_METHOD_TYPE_IDEAL },
+            }
+          : {};
+
         const response = await dispatch(
-          makeTransition(tx.id, transitions.INITIATE_PAYMENT, {})
+          makeTransition(currentTx.id, initiateTransition, initiateParams)
         ).unwrap();
-        tx = denormalisedResponseEntities(response)[0];
-        paymentIntents = tx?.attributes?.protectedData?.stripePaymentIntents;
+        currentTx = denormalisedResponseEntities(response)[0];
+        setTxOverride(currentTx);
+        intents = currentTx?.attributes?.protectedData?.stripePaymentIntents;
       }
 
-      if (!paymentIntents) {
+      if (!intents) {
         throw new Error(
           `Missing stripePaymentIntents in the transaction's protectedData. Check that the extra-payment process creates a payment intent.`
         );
       }
 
-      const { stripePaymentIntentClientSecret } = paymentIntents.default;
+      const { stripePaymentIntentClientSecret } = intents.default;
+
+      if (isIdeal) {
+        // Hands the window over to the customer's bank. On success this never
+        // returns - the page is gone before the promise settles.
+        await dispatch(
+          confirmCardPayment({
+            stripePaymentIntentClientSecret,
+            orderId: currentTx.id,
+            stripe,
+            mode: PAYMENT_METHOD_TYPE_IDEAL,
+            paymentParams: {
+              payment_method: {
+                billing_details: { name: billingName, email: currentUser?.attributes?.email },
+                ideal: {},
+              },
+              return_url: returnUrl,
+            },
+          })
+        );
+        // Still here, so the intent had already been confirmed. The webhook owns
+        // it from this point; say so rather than closing on a silent no-op.
+        setPaymentIntentStatus('processing');
+        return;
+      }
 
       const paymentResponse = await dispatch(
         confirmCardPayment({
           stripePaymentIntentClientSecret,
-          orderId: tx.id,
+          orderId: currentTx.id,
           // A card typed into the form comes with its own stripe instance
           ...(cardData?.card
             ? cardData
@@ -137,7 +304,7 @@ const ExtraPaymentModal = props => {
 
       const status = paymentResponse?.paymentIntent?.status;
       if (status === 'requires_capture' || status === 'succeeded') {
-        await dispatch(makeTransition(tx.id, transitions.CONFIRM_PAYMENT, {}));
+        await dispatch(makeTransition(currentTx.id, transitions.CONFIRM_PAYMENT, {}));
         onPaid?.();
         onCloseModal();
       } else {
@@ -145,6 +312,10 @@ const ExtraPaymentModal = props => {
       }
     } catch (e) {
       setPayError(intl.formatMessage({ id: 'ExtraPaymentModal.paymentFailed' }));
+      // The transaction may well have moved on even though the payment didn't
+      // finish, so let the page refetch. Without this the next attempt is made
+      // against a stale state and fails for a second, confusing reason.
+      onPaid?.();
     } finally {
       setPayInProgress(false);
     }
@@ -187,7 +358,7 @@ const ExtraPaymentModal = props => {
   const handleDecline = async () => {
     try {
       setPayInProgress(true);
-      await dispatch(makeTransition(extraPaymentTx.id, transitions.DECLINE, {}));
+      await dispatch(makeTransition(extraPaymentTx.id, declineTransition, {}));
       onPaid?.();
       onCloseModal();
     } catch (e) {
@@ -198,11 +369,111 @@ const ExtraPaymentModal = props => {
   };
 
   const formattedAmount = payinTotal ? formatMoney(intl, payinTotal) : null;
-  const isPayable = [transitions.REQUEST_EXTRA_PAYMENT, transitions.INITIATE_PAYMENT].includes(
-    lastTransition
-  );
+  const isPayable = [
+    transitions.REQUEST_EXTRA_PAYMENT,
+    transitions.INITIATE_PAYMENT,
+    transitions.INITIATE_PUSH_PAYMENT,
+  ].includes(lastTransition);
 
   const classes = classNames(rootClassName || css.root, className);
+
+  const declineButton = declineTransition ? (
+    <SecondaryButton onClick={handleDecline} disabled={payInProgress}>
+      <FormattedMessage id="ExtraPaymentModal.declineButton" />
+    </SecondaryButton>
+  ) : null;
+
+  // Plain elements rather than the FieldSelect/FieldTextInput components: those
+  // are react-final-form fields and there is no Form around this part of the
+  // modal - the card form below is its own.
+  const paymentMethodSelector =
+    supportsPushPayment && !isAwaitingConfirmation ? (
+      <div className={css.paymentMethodType}>
+        <label className={css.detailLabel} htmlFor={`${id}-paymentMethodType`}>
+          <FormattedMessage id="StripePaymentForm.paymentMethodTypeHeading" />
+        </label>
+        <select
+          id={`${id}-paymentMethodType`}
+          value={paymentMethodType}
+          disabled={hasPaymentIntent || payInProgress}
+          onChange={e => setPaymentMethodChoice(e.currentTarget.value)}
+        >
+          <option value={PAYMENT_METHOD_TYPE_CARD}>
+            {intl.formatMessage({ id: 'StripePaymentForm.paymentMethodTypeCard' })}
+          </option>
+          <option value={PAYMENT_METHOD_TYPE_IDEAL}>
+            {intl.formatMessage({ id: 'StripePaymentForm.paymentMethodTypeIdeal' })}
+          </option>
+        </select>
+      </div>
+    ) : null;
+
+  const paymentBody = isAwaitingConfirmation ? (
+    // Money taken, transaction not caught up. No actions - both of them would
+    // do damage here.
+    <p className={css.awaitingConfirmation}>
+      <FormattedMessage id="ExtraPaymentModal.awaitingConfirmation" />
+    </p>
+  ) : isIdeal ? (
+    <>
+      <p className={css.idealInfo}>
+        <FormattedMessage id="StripePaymentForm.idealInfo" />
+      </p>
+      <div className={css.idealName}>
+        <label className={css.detailLabel} htmlFor={`${id}-idealName`}>
+          <FormattedMessage id="StripePaymentForm.billingDetailsNameLabel" />
+        </label>
+        <input
+          id={`${id}-idealName`}
+          type="text"
+          autoComplete="name"
+          placeholder={intl.formatMessage({
+            id: 'StripePaymentForm.billingDetailsNamePlaceholder',
+          })}
+          value={billingName}
+          onChange={e => setIdealName(e.currentTarget.value)}
+        />
+      </div>
+      <div className={css.actions}>
+        <PrimaryButton
+          onClick={() => handlePay()}
+          inProgress={payInProgress}
+          disabled={payInProgress || !stripe || !billingName || !returnUrl}
+        >
+          <FormattedMessage id="ExtraPaymentModal.payButton" values={{ amount: formattedAmount }} />
+        </PrimaryButton>
+        {declineButton}
+      </div>
+    </>
+  ) : savedPaymentMethodId ? (
+    <div className={css.actions}>
+      <PrimaryButton
+        onClick={() => handlePay()}
+        inProgress={payInProgress}
+        disabled={payInProgress || !stripe}
+      >
+        <FormattedMessage id="ExtraPaymentModal.payButton" values={{ amount: formattedAmount }} />
+      </PrimaryButton>
+      {declineButton}
+    </div>
+  ) : (
+    <>
+      <EnhancedPaymentMethodsForm
+        className={css.paymentForm}
+        formId="ExtraPaymentMethodsForm"
+        initialValues={{ name: defaultBillingName }}
+        onSubmit={handleCardFormSubmit}
+        hasDefaultPaymentMethod={false}
+        handleRemovePaymentMethod={() => {}}
+        inProgress={payInProgress}
+        submitText={intl.formatMessage(
+          { id: 'ExtraPaymentModal.payButton' },
+          { amount: formattedAmount }
+        )}
+      />
+      <div className={css.actions}>{declineButton}</div>
+    </>
+  );
 
   return (
     <Modal
@@ -238,7 +509,7 @@ const ExtraPaymentModal = props => {
 
       {payError ? <p className={css.error}>{payError}</p> : null}
 
-      {isLoadingCard ? (
+      {isLoadingCard || isCheckingPaymentIntent ? (
         <div className={css.loading}>
           <IconSpinner />
         </div>
@@ -246,42 +517,10 @@ const ExtraPaymentModal = props => {
         <p className={css.error}>
           <FormattedMessage id="ExtraPaymentModal.notPayable" />
         </p>
-      ) : savedPaymentMethodId ? (
-        <div className={css.actions}>
-          <PrimaryButton
-            onClick={() => handlePay()}
-            inProgress={payInProgress}
-            disabled={payInProgress || !stripe}
-          >
-            <FormattedMessage
-              id="ExtraPaymentModal.payButton"
-              values={{ amount: formattedAmount }}
-            />
-          </PrimaryButton>
-          <SecondaryButton onClick={handleDecline} disabled={payInProgress}>
-            <FormattedMessage id="ExtraPaymentModal.declineButton" />
-          </SecondaryButton>
-        </div>
       ) : (
         <>
-          <EnhancedPaymentMethodsForm
-            className={css.paymentForm}
-            formId="ExtraPaymentMethodsForm"
-            initialValues={{ name: `${firstName || ''} ${lastName || ''}`.trim() }}
-            onSubmit={handleCardFormSubmit}
-            hasDefaultPaymentMethod={false}
-            handleRemovePaymentMethod={() => {}}
-            inProgress={payInProgress}
-            submitText={intl.formatMessage(
-              { id: 'ExtraPaymentModal.payButton' },
-              { amount: formattedAmount }
-            )}
-          />
-          <div className={css.actions}>
-            <SecondaryButton onClick={handleDecline} disabled={payInProgress}>
-              <FormattedMessage id="ExtraPaymentModal.declineButton" />
-            </SecondaryButton>
-          </div>
+          {paymentMethodSelector}
+          {paymentBody}
         </>
       )}
     </Modal>

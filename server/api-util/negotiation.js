@@ -99,8 +99,14 @@ exports.getExtraPaymentStripeFeeLineItem = amount => {
   ];
 };
 
-// Once a payment has been confirmed the job is taken.
-exports.CONFIRM_PAYMENT = 'transition/confirm-payment';
+// Once a payment has been confirmed the job is taken. Push payment methods
+// (iDEAL) are confirmed by the operator from the Stripe webhook, through a
+// transition of their own, so both of these mean the same thing here.
+const CONFIRM_PAYMENT = 'transition/confirm-payment';
+exports.CONFIRM_PAYMENT = CONFIRM_PAYMENT;
+const CONFIRM_PUSH_PAYMENT = 'transition/confirm-push-payment';
+exports.CONFIRM_PUSH_PAYMENT = CONFIRM_PUSH_PAYMENT;
+exports.paymentConfirmedTransitions = [CONFIRM_PAYMENT, CONFIRM_PUSH_PAYMENT];
 
 const TRANSACTIONS_PER_PAGE = 100;
 

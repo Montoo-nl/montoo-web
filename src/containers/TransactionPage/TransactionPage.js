@@ -728,7 +728,22 @@ export const TransactionPageComponent = props => {
 
   // The panel only renders the action buttons when the process has actions of
   // its own. Extra payments sit outside that, so it needs telling.
-  const isJobPaidFor = txTransitions.some(t => t.transition === 'transition/confirm-payment');
+  // A push payment (iDEAL) is confirmed by its own transition, so both count.
+  const paymentConfirmedTransitions = [
+    process?.transitions?.CONFIRM_PAYMENT,
+    process?.transitions?.CONFIRM_PUSH_PAYMENT,
+  ].filter(Boolean);
+  const isJobPaidFor = txTransitions.some(t =>
+    paymentConfirmedTransitions.includes(t.transition)
+  );
+
+  // Stripe sends the customer back here after an iDEAL redirect, with the extra
+  // payment they were paying named in the query string. Only one of the two
+  // ActionButtons is told about it - see the prop below.
+  const extraPaymentIdFromRedirect =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('extraPayment')
+      : null;
   const hasExtraPayment = extraPaymentTxs.length > 0;
   const showExtraPaymentActions = (isProviderRole && isJobPaidFor) || hasExtraPayment;
 
@@ -941,6 +956,9 @@ export const TransactionPageComponent = props => {
           listingTypeConfig={foundListingTypeConfig}
           showButtons={stateData.showActionButtons}
           extraPaymentTxs={extraPaymentTxs}
+          autoOpenExtraPaymentId={
+            containerId === actionButtonContainer ? extraPaymentIdFromRedirect : null
+          }
           onRequestExtraPayment={onSubmitExtraPaymentRequest}
           onExtraPaymentUpdated={() => onFetchTransaction(transaction?.id, transactionRole, config)}
           onManageDisableScrolling={onManageDisableScrolling}

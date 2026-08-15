@@ -40,6 +40,35 @@
     {:name :action/stripe-capture-payment-intent}
     {:name :action/stripe-create-payout}]}
 
+  ;; The push counterpart of initiate-payment, for iDEAL. The PaymentIntent has
+  ;; to be created with the allowed payment method types, which arrive as the
+  ;; mandatory `paymentMethodTypes` transition parameter. The choice is written
+  ;; to protectedData too, so a customer who comes back without having paid is
+  ;; offered the same method again - a push intent cannot be confirmed as a card
+  ;; one, or the other way round.
+  {:name :transition/initiate-push-payment,
+   :from :state/payment-requested,
+   :to :state/pending-confirmation,
+   :actor :actor.role/customer,
+   :actions
+   [{:name :action/update-protected-data}
+    {:name :action/stripe-create-payment-intent-push}]}
+
+  ;; Made by the operator from the Stripe webhook: the customer confirms in
+  ;; their own bank and the browser never comes back through the client. The
+  ;; payout has to be created here - :state/paid is final, so there is no later
+  ;; transition that could ever pay the technician.
+  ;; stripe-capture-payment-intent is a documented no-op on a push intent; it is
+  ;; kept so both payment methods confirm through the same set of actions.
+  {:name :transition/confirm-push-payment,
+   :from :state/pending-confirmation,
+   :to :state/paid,
+   :actor :actor.role/operator,
+   :actions
+   [{:name :action/stripe-confirm-payment-intent}
+    {:name :action/stripe-capture-payment-intent}
+    {:name :action/stripe-create-payout}]}
+
   ;; The customer doesn't agree with the request.
   {:name :transition/decline,
    :from :state/payment-requested,
@@ -70,7 +99,8 @@
      {:fn/period ["P7D"]}]},
    :actions []}
 
-  ;; The customer opened the modal but never confirmed the card.
+  ;; The customer opened the modal but never confirmed the card. Nothing was
+  ;; captured - this only drops an authorization.
   {:name :transition/expire-payment,
    :from :state/pending-confirmation,
    :to :state/expired,
@@ -92,4 +122,8 @@
   {:name :notification/extra-payment-declined,
    :on :transition/decline,
    :to :actor.role/provider,
-   :template :extra-payment-declined}]}
+   :template :extra-payment-declined}
+  {:name :notification/extra-payment-paid-push,
+   :on :transition/confirm-push-payment,
+   :to :actor.role/provider,
+   :template :extra-payment-paid}]}

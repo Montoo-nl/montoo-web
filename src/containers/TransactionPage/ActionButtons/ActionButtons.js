@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
 
 import { FormattedMessage, useIntl } from '../../../util/reactIntl';
@@ -9,8 +9,8 @@ import { types as sdkTypes } from '../../../util/sdkLoader';
 import {
   isPaid as isExtraPaymentPaid,
   isPayable as isExtraPaymentPayable,
-  transitions as extraPaymentTransitions,
 } from '../../../transactions/transactionProcessExtraPayment';
+import { transitions as negotiationTransitions } from '../../../transactions/transactionProcessNegotiation';
 
 import { PrimaryButton, SecondaryButton, Button } from '../../../components';
 
@@ -25,7 +25,13 @@ export const ACTION_BUTTON_2_ID = 'actionButton2';
 export const ACTION_BUTTON_3_ID = 'actionButton3';
 
 const hasReachedMaxDurationSinceTransition = (condition, transitions, timeZone) => {
-  const sinceTransition = transitions.find(t => t.transition === condition.sinceTransition);
+  // sinceTransition may name several transitions, for a milestone that can be
+  // reached in more than one way - e.g. a payment confirmed by card or by a
+  // push payment method. The first one found is the one that happened.
+  const sinceTransitionNames = Array.isArray(condition.sinceTransition)
+    ? condition.sinceTransition
+    : [condition.sinceTransition];
+  const sinceTransition = transitions.find(t => sinceTransitionNames.includes(t.transition));
   if (sinceTransition) {
     const enteredAt = getStartOf(sinceTransition.createdAt, 'day', timeZone);
     const expiresAt = getStartOf(enteredAt, 'day', timeZone, condition.days, 'days');
@@ -103,7 +109,7 @@ const getButtonStatus = (buttonProps, additionalInfo) => {
  * @typedef {Object} DurationSinceTransitionCondition
  * @property {'durationSinceTransition'} type - Type of condition
  * @property {'disable'} action - Action to take when condition is met
- * @property {string} sinceTransition - The transition name to check duration since
+ * @property {string|Array<string>} sinceTransition - The transition name to check duration since, or several names when the milestone can be reached in more than one way
  * @property {number} days - Number of days after which the condition applies
  * @property {DisabledReason} disabledReason - Reason for disabling the button
  */
@@ -175,6 +181,11 @@ const ActionButtons = props => {
     // Extra payments: everything the two sides do about an amount asked for
     // after the job was paid for lives here, next to the process's own actions.
     extraPaymentTxs = [],
+    // Set when the customer is coming back from an iDEAL redirect, so the modal
+    // they left can be put back in front of them. Only one of the two rendered
+    // ActionButtons is given this - the modal is portalled, so opening it from
+    // both would put two of them on the page.
+    autoOpenExtraPaymentId,
     onRequestExtraPayment,
     onExtraPaymentUpdated,
     onManageDisableScrolling,
@@ -194,6 +205,17 @@ const ActionButtons = props => {
   // that single child transaction: its last transition says whether it is still
   // waiting, was paid, or was turned down.
   const extraPayment = extraPaymentTxs[0] || null;
+
+  // Reopen the modal after a redirect away to the customer's bank. Done once
+  // per id: closing it should stay closed even though the URL still says so.
+  const autoOpenedRef = useRef(null);
+  useEffect(() => {
+    const matches = autoOpenExtraPaymentId && extraPayment?.id?.uuid === autoOpenExtraPaymentId;
+    if (matches && autoOpenedRef.current !== autoOpenExtraPaymentId) {
+      autoOpenedRef.current = autoOpenExtraPaymentId;
+      setReviewedExtraPayment(extraPayment);
+    }
+  }, [autoOpenExtraPaymentId, extraPayment]);
   const extraPaymentLastTransition = extraPayment?.attributes?.lastTransition;
   const extraPaymentAmount = extraPayment?.attributes?.payinTotal;
   const formattedExtraPayment = extraPaymentAmount ? formatMoney(intl, extraPaymentAmount) : '';
@@ -202,10 +224,14 @@ const ActionButtons = props => {
   const wasExtraPaymentPaid = isExtraPaymentPaid(extraPaymentLastTransition);
 
   // Asking for more only makes sense once the job itself has been paid for -
-  // before that, the amount is still being negotiated.
-  const isJobPaidFor = transitions.some(
-    t => t.transition === extraPaymentTransitions.CONFIRM_PAYMENT
-  );
+  // before that, the amount is still being negotiated. These are the job's own
+  // transitions: a card payment and a push payment (iDEAL) are confirmed by
+  // different ones, and either means the job is paid.
+  const jobPaidTransitions = [
+    negotiationTransitions.CONFIRM_PAYMENT,
+    negotiationTransitions.CONFIRM_PUSH_PAYMENT,
+  ];
+  const isJobPaidFor = transitions.some(t => jobPaidTransitions.includes(t.transition));
   const canRequestExtraPayment = isProvider && isJobPaidFor && !extraPayment;
 
   const handleOpenRequestModal = () => {

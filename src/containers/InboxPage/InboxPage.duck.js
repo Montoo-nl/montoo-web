@@ -1,7 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { storableError } from '../../util/errors';
 import { parse, getValidInboxSort } from '../../util/urlHelpers';
-import { getSupportedProcessesInfo } from '../../transactions/transaction';
+import {
+  EXTRA_PAYMENT_PROCESS_NAME,
+  getSupportedProcessesInfo,
+} from '../../transactions/transaction';
 import { addMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 
 const INBOX_PAGE_SIZE = 10;
@@ -63,7 +66,9 @@ const loadDataPayloadCreator = ({ params, search }, { dispatch, rejectWithValue,
   }
 
   const { page = 1, sort } = parse(search);
-  const processNames = getSupportedProcessesInfo().map(p => p.name);
+  const processNames = getSupportedProcessesInfo()
+    .map(p => p.name)
+    .filter(p => p !== EXTRA_PAYMENT_PROCESS_NAME);
 
   const apiQueryParams = {
     only: onlyFilter,

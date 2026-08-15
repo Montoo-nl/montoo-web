@@ -1,6 +1,6 @@
 const { handleError, getIntegrationSdk } = require('../api-util/sdk');
 const {
-  CONFIRM_PAYMENT,
+  paymentConfirmedTransitions,
   pendingOfferTransitions,
   queryAllTransactionsForListing,
 } = require('../api-util/negotiation');
@@ -30,7 +30,9 @@ module.exports = async function(req, res) {
     const transactions = await queryAllTransactionsForListing(iSdk, listingId);
 
     const hasConfirmedPayment = transactions.some(tx =>
-      (tx.attributes?.transitions || []).some(t => t.transition === CONFIRM_PAYMENT)
+      (tx.attributes?.transitions || []).some(t =>
+        paymentConfirmedTransitions.includes(t.transition)
+      )
     );
 
     const pendingOfferCount = transactions.filter(tx =>
