@@ -99,7 +99,7 @@ class GeocoderMapbox {
    * and an array of predictions. The format of the predictions is
    * only relevant for the `getPlaceDetails` function below.
    */
-  getPlacePredictions(search, countryLimit, locale) {
+  getPlacePredictions(search, countryLimit, locale, typeLimit) {
     const limitCountriesMaybe = countryLimit ? { countries: countryLimit } : {};
 
     return this.getClient()
@@ -108,6 +108,10 @@ class GeocoderMapbox {
         limit: 5,
         ...limitCountriesMaybe,
         language: [locale],
+        // Narrows what a prediction can be - e.g. towns and regions rather than
+        // individual street addresses. Mapbox place types:
+        // https://docs.mapbox.com/api/search/geocoding/#data-types
+        ...(typeLimit ? { types: typeLimit } : {}),
       })
       .send()
       .then(response => {
