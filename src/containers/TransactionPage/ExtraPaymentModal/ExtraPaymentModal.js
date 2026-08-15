@@ -9,7 +9,7 @@ import { formatMoney } from '../../../util/currency';
 import { denormalisedResponseEntities } from '../../../util/data';
 import { STRIPE_JS_LOADED_EVENT } from '../../../util/includeScripts';
 import { confirmCardPayment, retrievePaymentIntent } from '../../../ducks/stripe.duck';
-import { transitions } from '../../../transactions/transactionProcessExtraPayment';
+import { isPaid, transitions } from '../../../transactions/transactionProcessExtraPayment';
 
 import { IconSpinner, Modal, PrimaryButton, SecondaryButton } from '../../../components';
 
@@ -374,6 +374,11 @@ const ExtraPaymentModal = props => {
     transitions.INITIATE_PAYMENT,
     transitions.INITIATE_PUSH_PAYMENT,
   ].includes(lastTransition);
+  // Coming back from an iDEAL redirect can land on a request the webhook has
+  // already confirmed. That is a success, not a request that closed without
+  // being paid, and it needs saying - the customer has just been sent back here
+  // from their bank and has no other confirmation that it worked.
+  const isAlreadyPaid = isPaid(lastTransition);
 
   const classes = classNames(rootClassName || css.root, className);
 
@@ -513,6 +518,13 @@ const ExtraPaymentModal = props => {
         <div className={css.loading}>
           <IconSpinner />
         </div>
+      ) : isAlreadyPaid ? (
+        <p className={css.paidConfirmation}>
+          <FormattedMessage
+            id="ExtraPaymentModal.paidConfirmation"
+            values={{ amount: formattedAmount }}
+          />
+        </p>
       ) : !isPayable ? (
         <p className={css.error}>
           <FormattedMessage id="ExtraPaymentModal.notPayable" />

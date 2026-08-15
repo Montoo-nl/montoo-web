@@ -85,6 +85,12 @@
   margin: 0 0 12px 0;
 }
 
+.paidConfirmation {
+  composes: h4 from global;
+  color: var(--colorSuccess);
+  margin: 12px 0 0 0;
+}
+
 .awaitingConfirmation {
   composes: h5 from global;
   color: var(--colorGrey700);

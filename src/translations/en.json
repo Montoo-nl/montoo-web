@@ -1650,5 +1650,6 @@
   "StripePaymentForm.paymentMethodTypeCard": "Card",
   "StripePaymentForm.paymentMethodTypeIdeal": "iDEAL",
   "StripePaymentForm.idealInfo": "You will be taken to your own bank to confirm the payment, and brought back here afterwards.",
-  "ExtraPaymentModal.awaitingConfirmation": "We have your payment. The technician will be paid as soon as your bank confirms it - this usually takes a moment."
+  "ExtraPaymentModal.awaitingConfirmation": "We have your payment. The technician will be paid as soon as your bank confirms it - this usually takes a moment.",
+  "ExtraPaymentModal.paidConfirmation": "Paid. {amount} is on its way to the technician."
 }
