@@ -5,6 +5,9 @@ import Field from '../../Field';
 
 import css from './SectionContainer.module.css';
 
+// Section id of the landing page hero, as set in Console.
+const HERO_SECTION_ID = 'landing-hero';
+
 /**
  * @typedef {Object} FieldComponentConfig
  * @property {ReactNode} component
@@ -32,6 +35,15 @@ const SectionContainer = props => {
   const Tag = as || 'section';
   const classes = classNames(rootClassName || css.root, className);
 
+  // The hero's background is the largest thing on the landing page and sits at
+  // the top of it, so it is almost always what decides the largest contentful
+  // paint. Telling the browser to fetch it first gets it started before the
+  // rest of the page competes for bandwidth.
+  //
+  // Keyed on the section id rather than on the template, so it keeps working if
+  // the hero is rebuilt with a different section type.
+  const isPriorityBackground = id === HERO_SECTION_ID;
+
   return (
     <Tag className={classes} id={id} {...otherProps}>
       {appearance?.fieldType === 'customAppearance' ? (
@@ -39,6 +51,11 @@ const SectionContainer = props => {
           data={{ alt: `Background image for ${id}`, ...appearance }}
           className={className}
           options={options}
+          {...(isPriorityBackground
+            ? { fetchpriority: 'high' }
+            : // Everything below the hero can wait. Left eager, these compete
+              // with it for the same connections while being off screen.
+              { loading: 'lazy' })}
         />
       ) : null}
 

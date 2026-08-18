@@ -15,6 +15,10 @@ import { apiBaseUrl } from '../../util/api';
 
 import css from './Page.module.css';
 
+// Where Sharetribe serves image assets from. It is the host in every image
+// variant URL, and it is allowed explicitly in server/csp.js.
+const IMAGE_CDN_ORIGIN = 'https://sharetribe.imgix.net';
+
 const preventDefault = e => {
   e.preventDefault();
 };
@@ -254,6 +258,17 @@ class PageComponent extends Component {
           <title>{pageTitle}</title>
           {referrer ? <meta name="referrer" content={referrer} /> : null}
           <link rel="canonical" href={canonicalUrl} />
+
+          {/* Images - listing photos, section backgrounds, avatars - are served
+              from imgix, a different origin to this app. Opening that connection
+              up front takes the DNS lookup, TCP handshake and TLS negotiation
+              off the critical path of the first image, which on the landing page
+              is the hero and usually the largest contentful paint.
+              crossOrigin because images are fetched anonymously; without it the
+              browser would open a second, separate connection. */}
+          <link rel="preconnect" href={IMAGE_CDN_ORIGIN} crossOrigin="anonymous" />
+          {/* For browsers that ignore preconnect, at least resolve the name early. */}
+          <link rel="dns-prefetch" href={IMAGE_CDN_ORIGIN} />
 
           {faviconVariants.map(variant => {
             return (

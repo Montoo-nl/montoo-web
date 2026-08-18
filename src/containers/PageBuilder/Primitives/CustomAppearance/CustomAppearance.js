@@ -33,6 +33,10 @@ import css from './CustomAppearance.module.css';
  * @param {number} props.backgroundImageOverlay.opacity
  * @param {string?} props.alt
  * @param {string?} props.sizes
+ * @param {string?} props.fetchpriority 'high' for a background that is the page's
+ *   largest contentful paint, so the browser fetches it ahead of the rest
+ * @param {string?} props.loading 'lazy' for a background below the fold, so it
+ *   doesn't compete with what is on screen
  * @returns {JSX.Element} custom appearance for the container of a section component
  */
 export const CustomAppearance = React.forwardRef((props, ref) => {
@@ -44,6 +48,11 @@ export const CustomAppearance = React.forwardRef((props, ref) => {
     backgroundImageOverlay,
     alt = 'background image',
     sizes,
+    // Lower case on purpose: React 18 passes unknown lower case attributes
+    // straight through to the DOM, where the camelCase spelling would only
+    // earn a warning before being lower cased anyway.
+    fetchpriority,
+    loading,
   } = props;
 
   const getVariantNames = img => {
@@ -72,6 +81,8 @@ export const CustomAppearance = React.forwardRef((props, ref) => {
           image={backgroundImage}
           variants={getVariantNames(backgroundImage)}
           sizes={sizes}
+          {...(fetchpriority ? { fetchpriority } : {})}
+          {...(loading ? { loading } : {})}
         />
       ) : null}
       {hasBackgroundOverlay ? <div className={css.backgroundOverlay} style={overlayStyle} /> : null}
