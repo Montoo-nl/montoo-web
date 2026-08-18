@@ -7,6 +7,7 @@ const {
   isIntentionToRequestExtraPayment,
 } = require('../api-util/negotiation');
 const {
+  createCookieTokenStore,
   getSdk,
   getTrustedSdk,
   getIntegrationSdk,
@@ -24,7 +25,7 @@ const LISTING_STATE_CLOSED = 'closed';
 // Note: the Integration SDK has its own UUID type and won't serialize the one
 // the Marketplace SDK returns, so ids have to be rebuilt when crossing over.
 const integrationSdkTypes = require('sharetribe-flex-integration-sdk').types;
-const toIntegrationUUID = id => new integrationSdkTypes.UUID(id?.uuid || id);
+const toIntegrationUUID = (id) => new integrationSdkTypes.UUID(id?.uuid || id);
 
 const getFullOrderData = (orderData, bodyParams, currency) => {
   const { offerInSubunits } = orderData || {};
@@ -70,7 +71,9 @@ const getMetadata = (orderData, transition) => {
 module.exports = (req, res) => {
   const { isSpeculative, orderData, bodyParams, queryParams } = req.body || {};
   const transitionName = bodyParams.transition;
-  const sdk = getSdk(req, res);
+  // Share one cookie token store so a refresh during listings.show is reused for exchangeToken.
+  const tokenStore = createCookieTokenStore(req, res);
+  const sdk = getSdk(req, res, tokenStore);
   let lineItems = null;
   let metadataMaybe = {};
 
@@ -87,7 +90,7 @@ module.exports = (req, res) => {
     }
     return getIntegrationSdk()
       .listings.close({ id: toIntegrationUUID(listingToReclose) })
-      .catch(e => {
+      .catch((e) => {
         // Leaving it open would let the job take new offers again, so this is
         // worth shouting about - but not worth failing the request that already
         // went through.
@@ -130,9 +133,9 @@ module.exports = (req, res) => {
           .then(() => getTrustedSdk(req));
       }
 
-      return getTrustedSdk(req);
+      return getTrustedSdk(req, res, tokenStore);
     })
-    .then(trustedSdk => {
+    .then((trustedSdk) => {
       const { params } = bodyParams;
 
       // Add lineItems to the body params
@@ -150,8 +153,8 @@ module.exports = (req, res) => {
       }
       return trustedSdk.transactions.initiate(body, queryParams);
     })
-    .then(apiResponse => recloseListingMaybe().then(() => apiResponse))
-    .then(apiResponse => {
+    .then((apiResponse) => recloseListingMaybe().then(() => apiResponse))
+    .then((apiResponse) => {
       const { status, statusText, data } = apiResponse;
       res
         .status(status)
@@ -165,7 +168,7 @@ module.exports = (req, res) => {
         )
         .end();
     })
-    .catch(e => {
+    .catch((e) => {
       // The listing has to go back to closed even if the initiate failed
       recloseListingMaybe().then(() => handleError(res, e));
     });
