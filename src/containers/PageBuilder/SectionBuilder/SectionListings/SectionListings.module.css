@@ -110,7 +110,7 @@
 
 @media (min-width: 1200px) {
   .listItem:last-of-type > * {
-    padding-right: 0px;
+    padding-right: 32px;
     width: calc(min(var(--contentMaxWidthPages), var(--carouselWidth)) - 32px);
   }
 }
@@ -154,7 +154,7 @@
 
 .threeColumns .listItem:last-of-type > *:not(.isInsideContainer) {
   @media (--viewportMedium) {
-    width: calc((min(var(--contentMaxWidthPages), var(--carouselWidth)) - 64px - 64px) / 3);
+    width: calc((min(var(--contentMaxWidthPages), var(--carouselWidth)) - 32px) / 3);
   }
 }
 

@@ -5,11 +5,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: #111119;
-  border: 1px solid #24242B;
-  border-radius: 38px;
+
   padding: 0px;
   color: inherit;
+  & .listingCard{
+    background-color: #111119;
+    border: 1px solid #24242B;
+    border-radius: 38px;
+  }
 
   /* Remove link's hover effect */
   &:hover {

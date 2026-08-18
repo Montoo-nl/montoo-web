@@ -157,6 +157,7 @@ export const ListingCard = props => {
       params={{ id, slug }}
       ariaLabel={cardAriaLabel}
     >
+      <div className={css.listingCard}>
       <div className={css.media}>
         {showListingImage ? (
           <ListingCardImage
@@ -205,6 +206,8 @@ export const ListingCard = props => {
           ) : null}
         </div>
       </div>
+      </div>
+   
     </NamedLink>
   );
 };
