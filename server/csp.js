@@ -150,9 +150,21 @@ exports.csp = (reportUri, reportOnly) => {
   // const { imgSrc = [self] } = defaultDirectives;
   // const exampleImgSrc = imgSrc.concat('my-custom-domain.example.com');
 
+  // CookieYes consent banner, loaded from <head> in public/index.html.
+  // - script + style: the banner script and its stylesheet come from the CDN
+  // - connect: the script fetches the banner config and posts consent logs
+  // - img: category icons and the banner logo
+  const cookieYes = ['cdn-cookieyes.com', '*.cookieyes.com'];
+  const { scriptSrc = [self] } = defaultDirectives;
+  const { connectSrc = [self] } = defaultDirectives;
+  const { styleSrc = [self] } = defaultDirectives;
+  const { imgSrc = [self] } = defaultDirectives;
+
   const customDirectives = {
-    // Example: Add custom directive override
-    // imgSrc: exampleImgSrc,
+    scriptSrc: scriptSrc.concat(cookieYes),
+    connectSrc: connectSrc.concat(cookieYes),
+    styleSrc: styleSrc.concat(cookieYes),
+    imgSrc: imgSrc.concat(cookieYes),
   };
 
   // ================ END CUSTOM CSP URLs ================ //
