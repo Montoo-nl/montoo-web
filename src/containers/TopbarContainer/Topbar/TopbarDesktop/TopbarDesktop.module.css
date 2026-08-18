@@ -195,7 +195,7 @@
   align-items: center;
   justify-content: center;
   width: 43px;
-  height: 56px;
+  height: 46px;
   padding: 0;
   margin: 0;
   color: var(--colorGrey700);
@@ -223,7 +223,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 56px;
+  height: 46px;
   padding: 0 20px;
   margin: 0;
 
@@ -247,7 +247,7 @@
   font-family: Poppins;
 font-weight: 700;
 font-style: Bold;
-font-size: 20px;
+font-size: 16px;
 leading-trim: NONE;
 line-height: 100%;
 letter-spacing: 0%;
@@ -260,6 +260,10 @@ text-transform: uppercase;
   font-size: 14px;
   line-height: 1;
   font-weight: var(--fontWeightBold);
+  & svg{
+    width: 30px;
+    height: 30px;
+  }
 }
 
 /* Profile menu */
