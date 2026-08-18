@@ -29,7 +29,7 @@ import css from './ExtraPaymentModal.module.css';
  * own version for up to a week and cannot be paid with iDEAL - the transition
  * simply isn't there - so the choice is not offered for them.
  */
-const PUSH_PAYMENT_MIN_PROCESS_VERSION = 3;
+const PUSH_PAYMENT_MIN_PROCESS_VERSION = 4;
 
 // PaymentIntent statuses where the customer's money is already with Stripe.
 // For a push payment that means captured - there is nothing left to pay, and
@@ -96,7 +96,9 @@ const ExtraPaymentModal = props => {
   // every decision below (which decline is legal, whether the method is locked)
   // would be made against the wrong state.
   const [txOverride, setTxOverride] = useState(null);
-  const [paymentMethodChoice, setPaymentMethodChoice] = useState(PAYMENT_METHOD_TYPE_CARD);
+  // iDEAL by default: it is what companies here overwhelmingly pay with, and it
+  // is much cheaper to process than a card.
+  const [paymentMethodChoice, setPaymentMethodChoice] = useState(PAYMENT_METHOD_TYPE_IDEAL);
   const [idealName, setIdealName] = useState(null);
   // Status of an intent that already exists, once we've asked Stripe for it.
   const [paymentIntentStatus, setPaymentIntentStatus] = useState(null);
@@ -141,7 +143,7 @@ const ExtraPaymentModal = props => {
       setTxOverride(null);
       setPayError(null);
       setIdealName(null);
-      setPaymentMethodChoice(PAYMENT_METHOD_TYPE_CARD);
+      setPaymentMethodChoice(PAYMENT_METHOD_TYPE_IDEAL);
       setPaymentIntentStatus(null);
     }
   }, [isOpen]);
@@ -241,18 +243,15 @@ const ExtraPaymentModal = props => {
         const initiateTransition = isIdeal
           ? transitions.INITIATE_PUSH_PAYMENT
           : transitions.INITIATE_PAYMENT;
-        // stripe-create-payment-intent-push takes the allowed payment method
-        // types as a mandatory transition parameter, and the choice is kept on
-        // the transaction so coming back here knows which intent exists.
-        const initiateParams = isIdeal
-          ? {
-              paymentMethodTypes: [PAYMENT_METHOD_TYPE_IDEAL],
-              protectedData: { paymentMethodType: PAYMENT_METHOD_TYPE_IDEAL },
-            }
-          : {};
 
+        // Both initiate transitions are privileged: the Stripe fee line item is
+        // worked out on the server from the method chosen here, and for iDEAL
+        // the mandatory paymentMethodTypes param is added there too. Only the
+        // choice itself travels, in orderData.
         const response = await dispatch(
-          makeTransition(currentTx.id, initiateTransition, initiateParams)
+          makeTransition(currentTx.id, initiateTransition, {
+            orderData: { paymentMethodType },
+          })
         ).unwrap();
         currentTx = denormalisedResponseEntities(response)[0];
         setTxOverride(currentTx);

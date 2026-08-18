@@ -23,11 +23,21 @@
 
   ;; The customer opens the payment modal: this creates the payment intent that
   ;; the browser then confirms with Stripe.
+  ;; The line items are rewritten here rather than when the request was made,
+  ;; because what Stripe charges depends on how the company pays and that is
+  ;; only known now. Privileged, so the fee is worked out on the server.
+  ;;
+  ;; Order matters: privileged-set-line-items must run before the intent is
+  ;; created. Sharetribe does not update a PaymentIntent's payin and payout if
+  ;; the line items change after it exists.
   {:name :transition/initiate-payment,
    :from :state/payment-requested,
    :to :state/pending-confirmation,
    :actor :actor.role/customer,
-   :actions [{:name :action/stripe-create-payment-intent}]}
+   :actions
+   [{:name :action/privileged-set-line-items}
+    {:name :action/stripe-create-payment-intent}],
+   :privileged? true}
 
   ;; Card confirmed. The money is captured and paid out to the technician in one
   ;; go - there is nothing left to deliver, the work is already done.
@@ -51,8 +61,10 @@
    :to :state/pending-confirmation,
    :actor :actor.role/customer,
    :actions
-   [{:name :action/update-protected-data}
-    {:name :action/stripe-create-payment-intent-push}]}
+   [{:name :action/privileged-set-line-items}
+    {:name :action/update-protected-data}
+    {:name :action/stripe-create-payment-intent-push}],
+   :privileged? true}
 
   ;; Made by the operator from the Stripe webhook: the customer confirms in
   ;; their own bank and the browser never comes back through the client. The

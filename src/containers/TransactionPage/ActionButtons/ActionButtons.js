@@ -302,6 +302,14 @@ const ActionButtons = props => {
   // The technician sees what actually reaches them: the transaction's own
   // payout total, rather than the percentage worked out again on this side.
   const extraPaymentPayout = extraPayment?.attributes?.payoutTotal;
+  // The fee is only worked out when the company pays, because it depends on
+  // whether they use a card or iDEAL. Until then the payout equals the amount,
+  // which would otherwise be shown as a '-0,00' fee and a payout that isn't
+  // settled yet.
+  const isFeeSettled = extraPaymentAmount && extraPaymentPayout
+    ? extraPaymentPayout.amount < extraPaymentAmount.amount
+    : false;
+
   const providerBreakdown =
     isProvider && extraPaymentAmount && extraPaymentPayout ? (
       <div className={css.extraPaymentBreakdown}>
@@ -315,23 +323,35 @@ const ActionButtons = props => {
           <span>
             <FormattedMessage id="ActionButtons.extraPaymentFeeLabel" />
           </span>
-          <span>
-            -
-            {formatMoney(
-              intl,
-              new Money(
-                extraPaymentAmount.amount - extraPaymentPayout.amount,
-                extraPaymentAmount.currency
-              )
-            )}
-          </span>
+          {isFeeSettled ? (
+            <span>
+              -
+              {formatMoney(
+                intl,
+                new Money(
+                  extraPaymentAmount.amount - extraPaymentPayout.amount,
+                  extraPaymentAmount.currency
+                )
+              )}
+            </span>
+          ) : (
+            <span className={css.extraPaymentPending}>
+              <FormattedMessage id="ActionButtons.extraPaymentFeePending" />
+            </span>
+          )}
         </div>
-        <div className={classNames(css.extraPaymentRow, css.extraPaymentTotal)}>
-          <span>
-            <FormattedMessage id="ActionButtons.extraPaymentPayoutLabel" />
-          </span>
-          <span>{formatMoney(intl, extraPaymentPayout)}</span>
-        </div>
+        {isFeeSettled ? (
+          <div className={classNames(css.extraPaymentRow, css.extraPaymentTotal)}>
+            <span>
+              <FormattedMessage id="ActionButtons.extraPaymentPayoutLabel" />
+            </span>
+            <span>{formatMoney(intl, extraPaymentPayout)}</span>
+          </div>
+        ) : (
+          <p className={css.extraPaymentPendingNote}>
+            <FormattedMessage id="ActionButtons.extraPaymentFeePendingNote" />
+          </p>
+        )}
       </div>
     ) : null;
 

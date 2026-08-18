@@ -3,6 +3,9 @@ const { transactionLineItems } = require('../api-util/lineItems');
 const {
   addOfferToMetadata,
   getAmountFromPreviousOffer,
+  getExtraPaymentStripeFeeLineItem,
+  isExtraPaymentInitiateTransition,
+  STRIPE_FEE_CODE,
   isIntentionToMakeCounterOffer,
   isIntentionToMakeOffer,
   isIntentionToRevokeCounterOffer,
@@ -88,6 +91,45 @@ const getFullOrderData = (orderData, bodyParams, currency, offers) => {
     : orderDataAndParams;
 };
 
+const IDEAL_PAYMENT_METHOD = 'ideal';
+
+/**
+ * Line items for an extra payment that is about to be paid.
+ *
+ * privileged-set-line-items replaces everything, so the amount the technician
+ * asked for has to be carried over as it stands - it was fixed when the request
+ * was made and nothing here may change it. Only the Stripe fee is new, and it
+ * is only now that it can be worked out, because it depends on how the company
+ * chose to pay.
+ *
+ * @param {Object} transaction the extra payment transaction
+ * @param {string} paymentMethodType 'card' or 'ideal'
+ * @returns {Array} the line items to set
+ */
+const getExtraPaymentInitiateLineItems = (transaction, paymentMethodType) => {
+  const existingLineItems = transaction.attributes.lineItems || [];
+
+  // Rebuilt field by field: the API returns line items with computed extras
+  // (lineTotal, reversal) that can't be sent back.
+  const baseLineItems = existingLineItems
+    .filter(lineItem => lineItem.code !== STRIPE_FEE_CODE && !lineItem.reversal)
+    .map(lineItem => ({
+      code: lineItem.code,
+      unitPrice: lineItem.unitPrice,
+      includeFor: lineItem.includeFor,
+      ...(lineItem.quantity ? { quantity: lineItem.quantity } : {}),
+      ...(lineItem.percentage ? { percentage: lineItem.percentage } : {}),
+      ...(lineItem.seats ? { seats: lineItem.seats } : {}),
+      ...(lineItem.units ? { units: lineItem.units } : {}),
+    }));
+
+  // An extra payment carries no commission, so what the company pays is exactly
+  // what was asked for - which makes payinTotal the amount the fee applies to.
+  const amount = transaction.attributes.payinTotal;
+
+  return [...baseLineItems, ...getExtraPaymentStripeFeeLineItem(amount, paymentMethodType)];
+};
+
 const getUpdatedMetadata = (orderData, transition, existingMetadata) => {
   const { actor, offerInSubunits } = orderData || {};
   // NOTE: for default-negotiation process, the actor is always "provider" when making an offer.
@@ -145,14 +187,22 @@ module.exports = (req, res) => {
       const { providerCommission, customerCommission } =
         commissionAsset?.type === 'jsonAsset' ? commissionAsset.attributes.data : {};
 
-      lineItems = transactionLineItems(
-        listing,
-        getFullOrderData(orderData, bodyParams, currency, existingOffers),
-        providerCommission,
-        customerCommission
-      );
+      // An extra payment about to be paid keeps its amount and only gains the
+      // fee for the method chosen; everything else builds its line items from
+      // the listing and the order data.
+      const isExtraPaymentInitiate = isExtraPaymentInitiateTransition(transitionName);
+      lineItems = isExtraPaymentInitiate
+        ? getExtraPaymentInitiateLineItems(transaction, orderData?.paymentMethodType)
+        : transactionLineItems(
+            listing,
+            getFullOrderData(orderData, bodyParams, currency, existingOffers),
+            providerCommission,
+            customerCommission
+          );
 
-      metadataMaybe = getUpdatedMetadata(orderData, transitionName, existingMetadata);
+      metadataMaybe = isExtraPaymentInitiate
+        ? {}
+        : getUpdatedMetadata(orderData, transitionName, existingMetadata);
 
       return getTrustedSdk(req, res, tokenStore);
     })
@@ -167,12 +217,28 @@ module.exports = (req, res) => {
       // Omit listingId from params (transition/request-payment-after-inquiry does not need it)
       const { listingId, ...restParams } = roleBasedBodyParams?.params || {};
 
+      // A push payment intent needs the allowed payment method types, and the
+      // choice is kept on the transaction so the client knows which kind of
+      // intent it is dealing with when the customer comes back from their bank.
+      // Both are added here rather than trusted from the client, because this
+      // is a privileged transition and its params are built server-side.
+      const isPushPayment =
+        isExtraPaymentInitiateTransition(transitionName) &&
+        orderData?.paymentMethodType === IDEAL_PAYMENT_METHOD;
+      const pushPaymentParamsMaybe = isPushPayment
+        ? {
+            paymentMethodTypes: [IDEAL_PAYMENT_METHOD],
+            protectedData: { paymentMethodType: IDEAL_PAYMENT_METHOD },
+          }
+        : {};
+
       // Add lineItems to the body params
       const body = {
         ...bodyParams,
         params: {
           ...restParams,
           lineItems,
+          ...pushPaymentParamsMaybe,
           ...metadataMaybe,
         },
       };

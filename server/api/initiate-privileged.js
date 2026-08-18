@@ -119,11 +119,16 @@ module.exports = (req, res) => {
 
       const fullOrderData = getFullOrderData(orderData, bodyParams, currency);
 
-      lineItems = [
-        ...transactionLineItems(listing, fullOrderData, providerCommission, customerCommission),
-        // The card fee is its own line item, taken off the payout
-        ...(isExtraPayment ? getExtraPaymentStripeFeeLineItem(fullOrderData.offer) : []),
-      ];
+      // Note: no Stripe fee line item here. What it costs depends on how the
+      // company chooses to pay, which isn't known while the technician is still
+      // composing the request - it is added on the initiate transition instead,
+      // see server/api/transition-privileged.js.
+      lineItems = transactionLineItems(
+        listing,
+        fullOrderData,
+        providerCommission,
+        customerCommission
+      );
       metadataMaybe = getMetadata(orderData, transitionName);
 
       if (isExtraPayment && listing.attributes?.state === LISTING_STATE_CLOSED) {

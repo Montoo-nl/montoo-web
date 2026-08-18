@@ -11,19 +11,33 @@ import { findDisallowedContent, getDisallowedContentMessage } from '../../../uti
 import { formatMoney } from '../../../util/currency';
 import { types as sdkTypes } from '../../../util/sdkLoader';
 import {
-  STRIPE_FEE_PERCENTAGE,
+  STRIPE_CARD_FEE_PERCENTAGE,
   splitExtraPaymentAmount,
 } from '../../../transactions/transactionProcessExtraPayment';
 
-import { Button, FieldCurrencyInput, FieldTextInput, Form, Modal } from '../../../components';
+import {
+  Button,
+  ExternalLink,
+  FieldCurrencyInput,
+  FieldTextInput,
+  Form,
+  Modal,
+} from '../../../components';
 
 import css from './RequestExtraPaymentModal.module.css';
 
 const { Money } = sdkTypes;
 
+// Where the fees below come from, so a technician can check them for themselves.
+const STRIPE_PRICING_URL = 'https://stripe.com/nl/pricing';
+
 /**
  * What the technician is left with once Stripe has taken its cut. Shown while
  * they type, so the amount they ask for isn't a surprise on the payout side.
+ *
+ * Both figures are shown because the deduction isn't settled yet: the company
+ * chooses card or iDEAL when they come to pay, and the fee is worked out then.
+ * Showing one number would be a promise this side can't keep.
  *
  * @param {Object} props
  * @param {Money} [props.amount] - The amount currently in the form
@@ -38,27 +52,46 @@ const PayoutBreakdown = props => {
     return null;
   }
 
-  const { feeInSubunits, payoutInSubunits, currency } = split;
+  const { currency, card, ideal } = split;
+  const money = subunits => formatMoney(intl, new Money(subunits, currency));
 
   return (
     <div className={css.breakdown}>
+      <div className={classNames(css.breakdownRow, css.breakdownTotal)}>
+        <span>
+          <FormattedMessage id="RequestExtraPaymentForm.amountAskedLabel" />
+        </span>
+        <span>{money(amount.amount)}</span>
+      </div>
+
+      <div className={css.breakdownRow}>
+        <span>
+          <FormattedMessage id="RequestExtraPaymentForm.idealFeeLabel" />
+        </span>
+        <span>-{money(ideal.feeInSubunits)}</span>
+      </div>
+
       <div className={css.breakdownRow}>
         <span>
           <FormattedMessage
-            id="RequestExtraPaymentForm.stripeFeeLabel"
-            values={{ percentage: STRIPE_FEE_PERCENTAGE }}
+            id="RequestExtraPaymentForm.cardFeeLabel"
+            values={{ percentage: STRIPE_CARD_FEE_PERCENTAGE }}
           />
         </span>
-        <span>-{formatMoney(intl, new Money(feeInSubunits, currency))}</span>
+        <span>-{money(card.feeInSubunits)}</span>
       </div>
-      <div className={classNames(css.breakdownRow, css.breakdownTotal)}>
-        <span>
-          <FormattedMessage id="RequestExtraPaymentForm.payoutLabel" />
-        </span>
-        <span>{formatMoney(intl, new Money(payoutInSubunits, currency))}</span>
-      </div>
+
       <p className={css.breakdownNote}>
-        <FormattedMessage id="RequestExtraPaymentForm.stripeFeeNote" />
+        <FormattedMessage
+          id="RequestExtraPaymentForm.stripeFeeNote"
+          values={{
+            stripePricingLink: (
+              <ExternalLink className={css.breakdownLink} href={STRIPE_PRICING_URL}>
+                <FormattedMessage id="RequestExtraPaymentForm.stripePricingLinkText" />
+              </ExternalLink>
+            ),
+          }}
+        />
       </p>
     </div>
   );
@@ -82,6 +115,7 @@ const RequestExtraPaymentForm = props => (
         currencyConfig,
         values,
       } = fieldRenderProps;
+
 
       const errorMessageMaybe = requestError ? (
         <FormattedMessage id="RequestExtraPaymentForm.submitFailed" />

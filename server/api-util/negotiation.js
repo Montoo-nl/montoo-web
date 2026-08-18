@@ -1,4 +1,8 @@
 // default-negotiation process: transitions that make the first offer
+const sharetribeSdk = require('sharetribe-flex-sdk');
+
+const { Money } = sharetribeSdk.types;
+
 const makeOfferTransitions = [
   'transition/make-offer',
   'transition/make-offer-after-inquiry',
@@ -56,9 +60,18 @@ exports.isIntentionToRequestExtraPayment = (offerInSubunits, transitionName) => 
   return transitionName === REQUEST_EXTRA_PAYMENT && offerInSubunits > 0;
 };
 
-// What Stripe charges to process the card payment. Withheld from the
-// technician's payout so the marketplace isn't paying the card fee itself.
-const STRIPE_FEE_PERCENTAGE = 3.2;
+// What Stripe charges to process a card payment. Withheld from the technician's
+// payout so the marketplace isn't paying the card fee itself.
+//
+// Note: the line item is set when the technician makes the request, which is
+// before the company has chosen how to pay - so it can only ever be one number,
+// and it is the card rate, the dearer of the two. An iDEAL payment costs the
+// marketplace a flat ~EUR 0.30 instead, and the difference stays with the
+// marketplace.
+// Keep in sync with STRIPE_CARD_FEE_PERCENTAGE in
+// src/transactions/transactionProcessExtraPayment.js, which is what the
+// technician is shown.
+const STRIPE_CARD_FEE_PERCENTAGE = 3;
 
 // Its own line item rather than a commission: the marketplace takes no
 // commission on an extra payment, this is only the cost of moving the money.
@@ -76,24 +89,64 @@ exports.getExtraPaymentCommissions = () => ({
   customerCommission: null,
 });
 
+// A push payment (iDEAL) costs a flat fee rather than a percentage, in the
+// smallest currency unit. Keep in sync with STRIPE_IDEAL_FEE_IN_SUBUNITS in
+// src/transactions/transactionProcessExtraPayment.js.
+const STRIPE_IDEAL_FEE_IN_SUBUNITS = 30;
+
+const IDEAL_PAYMENT_METHOD = 'ideal';
+
+// The transitions that create the PaymentIntent for an extra payment. They are
+// the point at which the payment method is finally known, so they are also
+// where the fee can be worked out.
+const EXTRA_PAYMENT_INITIATE_TRANSITIONS = [
+  'transition/initiate-payment',
+  'transition/initiate-push-payment',
+];
+exports.EXTRA_PAYMENT_INITIATE_TRANSITIONS = EXTRA_PAYMENT_INITIATE_TRANSITIONS;
+
+exports.isExtraPaymentInitiateTransition = transitionName =>
+  EXTRA_PAYMENT_INITIATE_TRANSITIONS.includes(transitionName);
+
 /**
  * The Stripe fee on an extra payment, as a line item taken off the technician's
  * payout. The customer pays the amount that was asked for; the fee comes out of
- * what is paid out, and stays with the marketplace to cover the card cost.
+ * what is paid out, and stays with the marketplace to cover the Stripe cost.
+ *
+ * The two methods are priced differently enough that one number can't stand for
+ * both: a card is a percentage of the amount, iDEAL is a flat fee no matter how
+ * large the payment is. That is why this is only worked out once the company
+ * has chosen - see EXTRA_PAYMENT_INITIATE_TRANSITIONS.
  *
  * @param {Money} amount the extra payment amount
+ * @param {string} paymentMethodType 'card' or 'ideal'
  * @returns {Array} the line item, or empty when there is no amount
  */
-exports.getExtraPaymentStripeFeeLineItem = amount => {
+exports.getExtraPaymentStripeFeeLineItem = (amount, paymentMethodType) => {
   if (!amount) {
     return [];
+  }
+
+  if (paymentMethodType === IDEAL_PAYMENT_METHOD) {
+    // Never more than the payment itself, so a tiny extra payment can't produce
+    // a negative payout.
+    const feeInSubunits = Math.min(STRIPE_IDEAL_FEE_IN_SUBUNITS, amount.amount);
+
+    return [
+      {
+        code: STRIPE_FEE_CODE,
+        unitPrice: new Money(-feeInSubunits, amount.currency),
+        quantity: 1,
+        includeFor: ['provider'],
+      },
+    ];
   }
 
   return [
     {
       code: STRIPE_FEE_CODE,
       unitPrice: amount,
-      percentage: -STRIPE_FEE_PERCENTAGE,
+      percentage: -STRIPE_CARD_FEE_PERCENTAGE,
       includeFor: ['provider'],
     },
   ];

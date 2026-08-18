@@ -76,6 +76,19 @@
   color: var(--colorGrey500);
 }
 
+/* Inherits the note's size so the link reads as part of the sentence rather
+   than as a button. */
+.breakdownLink {
+  color: var(--marketplaceColor);
+  font-size: inherit;
+  line-height: inherit;
+  text-decoration: underline;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
 .errorPlaceholder {
   color: var(--colorFail);
 
@@ -89,3 +102,10 @@
 .submitButton {
   margin-top: 16px;
 }
+
+
+
+/* The method picker sits on the first breakdown row so it lines up with the
+   figures below it. Width only - the global select style already supplies the
+   padding and the chevron, and overriding those is what makes the arrow land
+   on top of the text. */

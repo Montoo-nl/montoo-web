@@ -90,33 +90,52 @@ export const graph = {
 };
 
 /**
- * What Stripe charges to process the card payment. It is withheld from the
+ * What Stripe charges to process the payment. It is withheld from the
  * technician's payout as a 'line-item/stripe-fee' line item - it is not the
  * marketplace's commission, which doesn't apply to extra payments at all.
  *
- * Note: keep in sync with STRIPE_FEE_PERCENTAGE in server/api-util/negotiation.js,
+ * The two payment methods are priced completely differently: a card is a
+ * percentage of the amount, iDEAL is a flat fee however large the payment is.
+ *
+ * Note: keep STRIPE_CARD_FEE_PERCENTAGE in sync with server/api-util/negotiation.js,
  * which is what actually builds the line item.
  */
-export const STRIPE_FEE_PERCENTAGE = 3.2;
+export const STRIPE_CARD_FEE_PERCENTAGE = 3;
+
+// €0.30, in subunits. Flat, regardless of the amount.
+export const STRIPE_IDEAL_FEE_IN_SUBUNITS = 30;
 
 /**
- * Splits an extra payment amount into the fee and what is left for the
- * technician, for showing the breakdown before the request is sent.
+ * What the technician is left with, for each way the company might pay.
+ *
+ * Both are worked out because the method isn't known yet: this runs while the
+ * technician is composing the request, and the company only chooses card or
+ * iDEAL later, when they open the payment modal.
  *
  * @param {Money} amount the amount being asked for
- * @returns {Object|null} { fee, payout } as Money, or null without an amount
+ * @returns {Object|null} { currency, card, ideal }, each with feeInSubunits and
+ *   payoutInSubunits - or null without an amount
  */
 export const splitExtraPaymentAmount = amount => {
   if (!amount || typeof amount.amount !== 'number') {
     return null;
   }
 
-  const feeInSubunits = Math.round((amount.amount * STRIPE_FEE_PERCENTAGE) / 100);
+  const cardFeeInSubunits = Math.round((amount.amount * STRIPE_CARD_FEE_PERCENTAGE) / 100);
+  // A tiny request could be smaller than the flat fee, and a negative payout
+  // would be nonsense to show.
+  const idealFeeInSubunits = Math.min(STRIPE_IDEAL_FEE_IN_SUBUNITS, amount.amount);
 
   return {
-    feeInSubunits,
-    payoutInSubunits: amount.amount - feeInSubunits,
     currency: amount.currency,
+    card: {
+      feeInSubunits: cardFeeInSubunits,
+      payoutInSubunits: amount.amount - cardFeeInSubunits,
+    },
+    ideal: {
+      feeInSubunits: idealFeeInSubunits,
+      payoutInSubunits: amount.amount - idealFeeInSubunits,
+    },
   };
 };
 
@@ -156,7 +175,14 @@ export const isPayable = lastTransition => payableTransitions.includes(lastTrans
 // This process has no reviews
 export const isCustomerReview = () => false;
 export const isProviderReview = () => false;
-export const isPrivileged = transition => [transitions.REQUEST_EXTRA_PAYMENT].includes(transition);
+// The two initiate transitions are privileged because the Stripe fee line item
+// is worked out on the server, from the payment method the company picked.
+export const isPrivileged = transition =>
+  [
+    transitions.REQUEST_EXTRA_PAYMENT,
+    transitions.INITIATE_PAYMENT,
+    transitions.INITIATE_PUSH_PAYMENT,
+  ].includes(transition);
 export const isCompleted = lastTransition => paidTransitions.includes(lastTransition);
 
 // Nothing in this process refunds: a card in pending-confirmation holds an
