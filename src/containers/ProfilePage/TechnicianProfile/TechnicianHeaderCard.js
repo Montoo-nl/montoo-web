@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { useConfiguration } from '../../../context/configurationContext';
-import { FormattedMessage } from '../../../util/reactIntl';
+import { FormattedMessage, useIntl } from '../../../util/reactIntl';
 import { richText } from '../../../util/richText';
 import { AvatarLarge, H2, IconReviewStar, NamedLink } from '../../../components';
 
@@ -10,11 +10,17 @@ import {
   TECHNICIAN_PROFILE_PLACEHOLDERS as PLACEHOLDERS,
   getAggregateRating,
   getBaseLocationLabel,
+  getMemberSince,
   getWorkAreaLabel,
 } from './technicianProfileData';
 import css from './TechnicianProfile.module.css';
 
 const MIN_LENGTH_FOR_LONG_WORDS = 20;
+
+// Dutch writes month names in lower case, so 'aug 2026' is what the formatter
+// returns for this marketplace's locale. Shown mid-sentence next to the rating,
+// it reads better capitalised.
+const capitalizeFirst = s => (s ? `${s.charAt(0).toUpperCase()}${s.slice(1)}` : s);
 
 /**
  * The top card: who the technician is, how they are rated, and where they work.
@@ -40,7 +46,9 @@ const TechnicianHeaderCard = props => {
   } = props;
 
   const config = useConfiguration();
+  const intl = useIntl();
 
+  const memberSince = getMemberSince(profileUser);
   const ratingMaybe = getAggregateRating(publicData, reviews);
   // Service areas are a Console-managed user field, so their labels are read
   // from the hosted configuration rather than a list kept in the codebase.
@@ -93,12 +101,18 @@ const TechnicianHeaderCard = props => {
                 </span>
               </span>
             ) : null}
-            <span className={css.memberSince}>
-              <FormattedMessage
-                id="TechnicianProfile.memberSince"
-                values={{ date: PLACEHOLDERS.memberSince }}
-              />
-            </span>
+            {memberSince ? (
+              <span className={css.memberSince}>
+                <FormattedMessage
+                  id="TechnicianProfile.memberSince"
+                  values={{
+                    date: capitalizeFirst(
+                      intl.formatDate(memberSince, { month: 'short', year: 'numeric' })
+                    ),
+                  }}
+                />
+              </span>
+            ) : null}
           </div>
 
           {bioWithLinks ? <p className={css.bio}>{bioWithLinks}</p> : null}

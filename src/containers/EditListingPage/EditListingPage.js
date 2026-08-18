@@ -20,7 +20,12 @@ import {
 import { LISTING_STATE_DRAFT, LISTING_STATE_PENDING_APPROVAL, propTypes } from '../../util/types';
 import { isErrorNoPermissionToPostListings } from '../../util/errors';
 import { ensureOwnListing } from '../../util/data';
-import { hasPermissionToPostListings, isUserAuthorized } from '../../util/userHelpers';
+import {
+  getCurrentUserTypeRoles,
+  hasPermissionToPostListings,
+  isUserAuthorized,
+} from '../../util/userHelpers';
+import { useConfiguration } from '../../context/configurationContext';
 import { getMarketplaceEntities } from '../../ducks/marketplaceData.duck';
 import { manageDisableScrolling, isScrollingDisabled } from '../../ducks/ui.duck';
 import {
@@ -142,6 +147,7 @@ const pickRenderableImages = (
  */
 export const EditListingPageComponent = props => {
   const intl = useIntl();
+  const config = useConfiguration();
   const {
     currentUser,
     createStripeAccountError,
@@ -189,6 +195,20 @@ export const EditListingPageComponent = props => {
   const currentListing = ensureOwnListing(getOwnListing(listingId));
   const { state: currentListingState } = currentListing.attributes;
 
+  // Only companies post jobs on this marketplace - a technician answers them,
+  // and has nothing to create here. They can reach this page by URL, or by an
+  // old link, so it is guarded rather than only hidden from the menus.
+  //
+  // The !isCompany half is deliberate: getCurrentUserTypeRoles reports both
+  // roles whenever the user type can't be resolved - a user whose type isn't
+  // set, or before the hosted config has loaded - and a bare provider check
+  // would lock those people out of creating a listing at all.
+  const { customer: isCompany, provider: isTechnician } = getCurrentUserTypeRoles(
+    config,
+    currentUser
+  );
+  const shouldRedirectTechnician = !!currentUser?.id && isTechnician && !isCompany;
+
   const hasPostingRights = hasPermissionToPostListings(currentUser);
   const hasPostingRightsError = isErrorNoPermissionToPostListings(page.publishListingError?.error);
   const shouldRedirectNoPostingRights =
@@ -205,6 +225,13 @@ export const EditListingPageComponent = props => {
       <NamedRedirect
         name="NoAccessPage"
         params={{ missingAccessRight: NO_ACCESS_PAGE_USER_PENDING_APPROVAL }}
+      />
+    );
+  } else if (shouldRedirectTechnician) {
+    return (
+      <NamedRedirect
+        name="NoAccessPage"
+        params={{ missingAccessRight: NO_ACCESS_PAGE_POST_LISTINGS }}
       />
     );
   } else if (shouldRedirectNoPostingRights) {

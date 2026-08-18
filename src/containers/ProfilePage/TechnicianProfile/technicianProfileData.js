@@ -24,10 +24,6 @@ export const TECHNICIAN_PROFILE_PLACEHOLDERS = {
   // publicData.availability, set by the technician.
   isAvailable: true,
 
-  // STATIC: the public user entity carries no createdAt - only the account
-  // owner can see when they joined.
-  memberSince: 'Jan 2023',
-
   // Shown only until a technician sets their base location on the settings
   // page - see getBaseLocationLabel.
   baseLocation: 'Deventer, Overijssel',
@@ -91,6 +87,21 @@ export const getAggregateRating = (publicData, reviews = []) => {
   }
   const total = rated.reduce((sum, r) => sum + r.attributes.rating, 0);
   return { rating: total / rated.length, count: rated.length };
+};
+
+/**
+ * When the technician joined the marketplace. createdAt is on the public user
+ * resource, so it is readable on anyone's profile, not just one's own.
+ *
+ * @param {Object} profileUser the user being viewed
+ * @returns {Date|null} null when it isn't there, so the line can be left out
+ *   rather than showing a made-up date
+ */
+export const getMemberSince = profileUser => {
+  const createdAt = profileUser?.attributes?.createdAt;
+  const date = createdAt instanceof Date ? createdAt : createdAt ? new Date(createdAt) : null;
+
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 };
 
 /**
