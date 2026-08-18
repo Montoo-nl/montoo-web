@@ -14,6 +14,7 @@ import css from './DualToneField.module.css';
  * Update these phrases if Console copy changes.
  */
 const SECTION_DESCRIPTION_HIGHLIGHTS = {
+  'landing-hero': ['assignments & professionals'],
   'why-choose-mento': ['TWO SIDES OF THE WORK'],
   features: ['IN ONE PLACE'],
   'the-process': ['MONTOO'],
