@@ -187,7 +187,47 @@ const getOrderParams = (
   return orderParams;
 };
 
-const fetchSpeculatedTransactionIfNeeded = (orderParams, pageData, fetchSpeculatedTransaction) => {
+/**
+ * The payment method the checkout opens on.
+ *
+ * iDEAL where it is possible, because it is what customers here pay with and it
+ * costs a fraction of a card. Three things narrow that:
+ *  - only the negotiation process has push-payment transitions, so every other
+ *    process stays on card. Defaulting them to iDEAL would send the mandatory
+ *    paymentMethodTypes parameter into a transition that doesn't take it.
+ *  - once the transaction records a choice, that choice wins: the PaymentIntent
+ *    was created for it and can't be confirmed as the other kind.
+ *  - an intent with no recorded choice predates the recording, so it can only
+ *    be a card one.
+ *
+ * @param {Object} pageData data saved to session storage
+ * @returns {string} 'card' or 'ideal'
+ */
+const getDefaultPaymentMethodType = pageData => {
+  const tx = pageData?.transaction;
+  const processName =
+    tx?.attributes?.processName ||
+    pageData?.listing?.attributes?.publicData?.transactionProcessAlias?.split('/')[0];
+  const isNegotiation = resolveLatestProcessName(processName) === NEGOTIATION_PROCESS_NAME;
+
+  if (!isNegotiation) {
+    return PAYMENT_METHOD_TYPE_CARD;
+  }
+
+  const protectedData = tx?.attributes?.protectedData;
+  return protectedData?.paymentMethodType
+    ? protectedData.paymentMethodType
+    : protectedData?.stripePaymentIntents
+    ? PAYMENT_METHOD_TYPE_CARD
+    : PAYMENT_METHOD_TYPE_IDEAL;
+};
+
+const fetchSpeculatedTransactionIfNeeded = (
+  orderParams,
+  pageData,
+  fetchSpeculatedTransaction,
+  paymentMethodType
+) => {
   const tx = pageData ? pageData.transaction : null;
   const pageDataListing = pageData.listing;
   const processName =
@@ -212,8 +252,15 @@ const fetchSpeculatedTransactionIfNeeded = (orderParams, pageData, fetchSpeculat
       resolvedProcessName === NEGOTIATION_PROCESS_NAME &&
       tx.attributes.state === `state/${process.states.OFFER_PENDING}`;
 
+    // Speculate through the transition the customer will actually take, so the
+    // dry run exercises the same path - a push payment that the marketplace
+    // isn't set up for fails here, before they have typed anything, rather than
+    // when they press pay.
+    const isIdeal = paymentMethodType === PAYMENT_METHOD_TYPE_IDEAL;
     const requestTransition = isInquiryInPaymentProcess
       ? process.transitions.REQUEST_PAYMENT_AFTER_INQUIRY
+      : isOfferPendingInNegotiationProcess && isIdeal
+      ? process.transitions.REQUEST_PUSH_PAYMENT_TO_ACCEPT_OFFER
       : isOfferPendingInNegotiationProcess
       ? process.transitions.REQUEST_PAYMENT_TO_ACCEPT_OFFER
       : process.transitions.REQUEST_PAYMENT;
@@ -261,9 +308,28 @@ export const loadInitialDataForStripePayments = ({
   // The way to pass it to checkout page is through pageData.orderData
   const shippingDetails = {};
   const optionalPaymentParams = {};
-  const orderParams = getOrderParams(pageData, shippingDetails, optionalPaymentParams, config);
 
-  fetchSpeculatedTransactionIfNeeded(orderParams, pageData, fetchSpeculatedTransaction);
+  // The speculate has to run with the method the form will open on: the push
+  // transition takes paymentMethodTypes as a mandatory parameter and the card
+  // one does not accept it, so guessing wrong fails the dry run.
+  const paymentMethodType = getDefaultPaymentMethodType(pageData);
+
+  const orderParams = getOrderParams(
+    pageData,
+    shippingDetails,
+    optionalPaymentParams,
+    config,
+    {},
+    null,
+    paymentMethodType
+  );
+
+  fetchSpeculatedTransactionIfNeeded(
+    orderParams,
+    pageData,
+    fetchSpeculatedTransaction,
+    paymentMethodType
+  );
 };
 
 const handleSubmit = (values, process, props, stripe, submitting, setSubmitting) => {
@@ -623,7 +689,9 @@ export const CheckoutPageWithPayment = props => {
   const initialValuesForStripePayment = {
     name: userName,
     recipientName: userName,
-    paymentMethodType: txProtectedData?.paymentMethodType || PAYMENT_METHOD_TYPE_CARD,
+    // Same rule the speculate used, so the dry run and the real transition
+    // exercise the same transition.
+    paymentMethodType: getDefaultPaymentMethodType(pageData),
   };
   const askShippingDetails =
     orderData?.deliveryMethod === 'shipping' &&
