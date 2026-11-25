@@ -25,6 +25,7 @@ export const CMSPageComponent = props => {
 
   return (
     <PageBuilder
+pageId={pageId}
       pageAssetsData={pageAssetsData?.[pageId]?.data}
       inProgress={inProgress}
       schemaType="Article"
