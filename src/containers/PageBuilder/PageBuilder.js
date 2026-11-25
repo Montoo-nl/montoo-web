@@ -1,4 +1,5 @@
 import React from 'react';
+import AboutAudiencePage from '../AboutAudiencePage/AboutAudiencePage';
 
 import { IconSpinner, LayoutComposer } from '../../components/index.js';
 import TopbarContainer from '../../containers/TopbarContainer/TopbarContainer.js';
@@ -109,6 +110,7 @@ const PageBuilder = props => {
     options,
     currentPage,
     featuredListings,
+    pageId,
     ...pageProps
   } = props;
 
@@ -138,11 +140,18 @@ const PageBuilder = props => {
                 <TopbarContainer currentPage={currentPage} />
               </Topbar>
               <Main as="main" id="main-content" className={css.main}>
-                {sections.length === 0 && inProgress ? (
-                  <LoadingSpinner />
-                ) : (
-                  <SectionBuilder sections={sections} options={{ ...options, featuredListings }} />
-                )}
+              {sections.length === 0 && inProgress ? (
+  <LoadingSpinner />
+) : (
+  pageId === 'about' ? (
+    <AboutAudiencePage />
+  ) : (
+    <SectionBuilder
+      sections={sections}
+      options={{ ...options, featuredListings }}
+    />
+  )
+)}
               </Main>
               <Footer>
                 <FooterContainer />
